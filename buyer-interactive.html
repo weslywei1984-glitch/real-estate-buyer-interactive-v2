@@ -814,6 +814,63 @@
       gap: 10px;
     }
 
+    .reaction {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: reactionIn 0.3s ease both;
+    }
+
+    .reaction-avatar {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--teal), #28a893);
+      font-weight: 900;
+      font-size: 15px;
+    }
+
+    .reaction-bubble {
+      max-width: 560px;
+      border: 1px solid #c8e4da;
+      border-radius: 4px 14px 14px 14px;
+      background: #f3fbf8;
+      color: var(--teal-dark);
+      padding: 10px 14px;
+      font-size: 15px;
+      line-height: 1.6;
+      font-weight: 800;
+    }
+
+    @keyframes reactionIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .persona-tag {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--teal-dark);
+      background: #e7f4ef;
+      border: 1px solid #c8e4da;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
     .toast {
       display: none;
       border: 1px solid #c8e4da;
@@ -1018,8 +1075,9 @@
             <span>您的找房方向</span>
           </div>
           <div class="persona">
-            <p class="persona-name" id="personaName">方向整理中</p>
-            <p class="persona-copy" id="personaCopy">先回答區域、預算和條件，最後會產生買方類型與小魏建議。</p>
+            <p class="persona-name" id="personaName">🧭 方向整理中</p>
+            <span class="persona-tag" id="personaTag">回答越多，人格越準</span>
+            <p class="persona-copy" id="personaCopy">先回答區域、預算和條件，最後會產生您的買房人格與小魏建議。</p>
           </div>
           <div class="readiness" id="readinessPanel"></div>
           <div class="score-panel">
@@ -1043,7 +1101,8 @@
           </div>
         </div>
         <div class="actions">
-          <button class="btn primary" id="copyBtn" type="button">複製需求摘要</button>
+          <button class="btn primary" id="lineBtn" type="button">📩 把方向卡傳給小魏</button>
+          <button class="btn ghost" id="copyBtn" type="button">複製需求摘要</button>
           <button class="btn ghost" id="restartBtn" type="button">重新填寫</button>
           <div class="toast" id="toast">已複製，可以貼到 Messenger 對話裡。</div>
         </div>
@@ -1216,6 +1275,7 @@
     const nextBtn = document.getElementById("nextBtn");
     const chips = document.getElementById("chips");
     const personaName = document.getElementById("personaName");
+    const personaTag = document.getElementById("personaTag");
     const personaCopy = document.getElementById("personaCopy");
     const resultCard = document.getElementById("resultCard");
     const readinessPanel = document.getElementById("readinessPanel");
@@ -1227,6 +1287,7 @@
     const restartBtn = document.getElementById("restartBtn");
     const toast = document.getElementById("toast");
     let renderTimer = null;
+    let currentReaction = null;
 
     function render() {
       if (state.completed) {
@@ -1253,6 +1314,7 @@
         <h2>${step.title}</h2>
         <p class="hint">${step.hint}</p>
         ${renderInput(step)}
+        ${renderReaction(step)}
       `;
 
       bindStepEvents(step);
@@ -1260,7 +1322,7 @@
     }
 
     function renderCompletion() {
-      const [persona, personaCopyText] = getPersona();
+      const persona = getPersona();
       const clarity = getClarityScore();
       const directAdvice = getDirectAdvice();
       const readiness = getBuyerReadiness();
@@ -1281,10 +1343,10 @@
           </div>
           <div class="result-tabs">
             <details open>
-              <summary>我的買房人格</summary>
+              <summary>我的買房人格：${persona.emoji} ${escapeHtml(persona.fun)}</summary>
               <div class="tab-body">
-                <strong>${escapeHtml(persona)}</strong><br>
-                ${escapeHtml(personaCopyText)}
+                <strong>${persona.emoji} ${escapeHtml(persona.fun)}（${escapeHtml(persona.formal)}）</strong><br>
+                ${escapeHtml(persona.copy)}
               </div>
             </details>
             <details>
@@ -1315,12 +1377,14 @@
             </details>
           </div>
           <div class="completion-actions">
-            <button class="btn primary" id="completionCopy" type="button">複製方向整理</button>
+            <button class="btn primary" id="completionLine" type="button">📩 把這張方向卡傳給小魏</button>
+            <button class="btn ghost" id="completionCopy" type="button">複製方向整理</button>
             <button class="btn ghost" id="completionRestart" type="button">重新整理一次</button>
           </div>
         </div>
       `;
 
+      document.getElementById("completionLine").addEventListener("click", sendToLine);
       document.getElementById("completionCopy").addEventListener("click", () => {
         copySummary("已複製您的方向整理結果。");
       });
@@ -1506,6 +1570,7 @@
           button.addEventListener("click", () => {
             button.classList.add("tapped");
             state[step.key] = button.dataset.choice;
+            currentReaction = { stepKey: step.key, text: getReaction(step.key, button.dataset.choice) };
             if (step.key === "budget" && state.budget !== "自訂金額") state.customBudget = "";
             if (step.key === "parking" && state.parking !== "需要") state.parkingType = "";
             renderSummary();
@@ -1538,6 +1603,9 @@
             }
             if (step.otherChoice && !values.includes(step.otherChoice)) state[step.otherKey] = "";
             state[step.valuesKey] = values;
+            if (event.target.checked) {
+              currentReaction = { stepKey: step.key, text: getReaction(step.valuesKey, event.target.value) };
+            }
             renderSummary();
             animateResultCard();
             scheduleRender();
@@ -1677,32 +1745,155 @@
       return hints[key]?.[choice] || "先選大方向就可以";
     }
 
+    function getReaction(key, choice) {
+      const reactions = {
+        propertyTypes: {
+          "套房": "小而美，打掃十分鐘搞定 🧹",
+          "電梯大樓": "有管理有電梯，收包裹倒垃圾都省心 🛗",
+          "透天": "懂！台南人的浪漫就是透天 🏠",
+          "電梯透天": "透天空間＋電梯便利，長輩住也舒服 👍",
+          "店面": "看店面眼光不錯，人流和路段是關鍵 🚶",
+          "廠房": "實用派！動線和使用分區要先確認 🏭",
+          "土地": "土地是長線布局，這步棋走得遠 🌱"
+        },
+        ages: {
+          "預售屋": "喜歡全新的感覺！記得把交屋時間算進去 🏗️",
+          "5年內": "屋況新、整理成本低，聰明 ✨",
+          "5-10年": "新舊平衡點，社區也成熟了 👌",
+          "10-20年": "這區間常有高 CP 值好物 💎",
+          "20-30年": "會挑的話，老屋翻新超有味道 🛠️",
+          "不拘": "保持彈性，能看的物件多很多 🙌"
+        },
+        budget: {
+          "800萬以下": "小資起步讚！台南還是找得到好選擇 💪",
+          "800～1200萬": "這區間物件最搶手，看到喜歡的手腳要快 🔥",
+          "1200～1600萬": "選擇很完整，可以挑得很有感覺 👍",
+          "1600～2000萬": "這預算在台南可以住得很有品質 ✨",
+          "2000萬以上": "直接看精華段，眼光可以放遠 🎯",
+          "自訂金額": "有明確數字最好辦事！填一下下面的框 ✏️"
+        },
+        rooms: {
+          "1～2房": "輕巧生活，負擔也輕鬆 🎈",
+          "2房": "總價好控制，空間也夠用 👌",
+          "3房": "經典家庭款，未來彈性也大 👨‍👩‍👧",
+          "3房以上": "空間大器！書房、儲藏室都有了 📚",
+          "還不確定，先看適合的": "沒問題，先用預算和區域幫您抓 🤝"
+        },
+        parking: {
+          "需要": "了解！車位直接當硬條件來篩 🚗",
+          "不需要": "預算可以集中火力在房子本身 💰",
+          "有的話更好": "彈性保留，選擇會多不少 🙆",
+          "還不確定": "OK，先看物件再說也行 👍"
+        },
+        parkingType: {
+          "平面車位": "平面最好用，回家一分鐘入庫 🅿️",
+          "平面、機械都可以": "都能接受，物件池馬上變大 🌊"
+        },
+        purpose: {
+          "自住": "自己住的最重要，舒服擺第一 🛋️",
+          "投資": "投資眼光！行情和轉手性幫您顧好 📈",
+          "換屋": "生活升級的時候到了 🚀",
+          "幫家人找": "貼心！會多留意生活便利和照顧需求 💕",
+          "婚房": "恭喜！新生活從找對房子開始 💍",
+          "學區房": "為孩子鋪路，學校距離幫您把關 🎒",
+          "先了解行情": "做功課的買家最強，先看再說 📖"
+        },
+        timeline: {
+          "1個月內": "衝刺模式！有好物件馬上通知您 🏃",
+          "3個月內": "節奏剛好，可以好好比較不倉促 ⏱️",
+          "半年內": "時間充裕，先建立行情感 📊",
+          "一年內": "慢慢看，遇到對的再出手 🍵",
+          "先看看，不急": "完全沒壓力，先交個朋友 😄"
+        },
+        fengShui: {
+          "無特殊忌諱": "好相處！選擇會多很多 😄"
+        }
+      };
+      const generic = ["收到，這條件記下來了 ✍️", "了解，幫您note起來 📝", "好的，這點會特別留意 👀"];
+      return reactions[key]?.[choice] || generic[choice.length % generic.length];
+    }
+
+    function renderReaction(step) {
+      if (!currentReaction || currentReaction.stepKey !== step.key) return "";
+      return `
+        <div class="reaction">
+          <span class="reaction-avatar">魏</span>
+          <span class="reaction-bubble">${escapeHtml(currentReaction.text)}</span>
+        </div>
+      `;
+    }
+
     function getPersona() {
       if (hasPropertyType("店面") || hasPropertyType("廠房") || hasPropertyType("土地")) {
-        return ["資產規劃型買方", "適合重點比較地段、使用分區、坪效和未來發展性。"];
+        return {
+          emoji: "🏦",
+          fun: "資產布局師",
+          formal: "資產規劃型買方",
+          copy: "眼光放在資產配置，適合重點比較地段、使用分區、坪效和未來發展性。"
+        };
       }
       if (state.purpose === "投資" || state.priorities.includes("價格合適")) {
-        return ["精準比較型買方", "適合用行情、單價、租售需求和未來轉手性來整理物件。"];
+        return {
+          emoji: "🧮",
+          fun: "精算獵屋人",
+          formal: "精準比較型買方",
+          copy: "數字感很好、CP 值至上，適合用行情、單價、租售需求和轉手性來整理物件。"
+        };
       }
       if (state.purpose === "婚房") {
-        return ["新生活規劃型買方", "適合兼顧屋況、機能、空間彈性與未來家庭需求。"];
+        return {
+          emoji: "💍",
+          fun: "幸福築巢派",
+          formal: "新生活規劃型買方",
+          copy: "為兩個人的新生活找家，適合兼顧屋況、機能、空間彈性與未來家庭需求。"
+        };
       }
       if (state.purpose === "學區房" || state.priorities.includes("近學校")) {
-        return ["學區機能型買方", "適合優先看學校距離、通勤動線和生活機能完整度。"];
+        return {
+          emoji: "🎒",
+          fun: "現代孟母",
+          formal: "學區機能型買方",
+          copy: "孩子的教育擺第一，適合優先看學校距離、接送動線和生活機能完整度。"
+        };
       }
       if (state.purpose === "換屋" || state.rooms === "3房以上") {
-        return ["空間升級型買方", "適合優先看格局、收納、停車和家庭成員未來使用需求。"];
+        return {
+          emoji: "🚀",
+          fun: "空間升級玩家",
+          formal: "空間升級型買方",
+          copy: "生活要再升一級，適合優先看格局、收納、停車和家人未來的使用需求。"
+        };
       }
       if (state.priorities.includes("生活機能好") || state.priorities.includes("交通方便")) {
-        return ["機能效率型買方", "適合從商圈、交通、學校和採買便利度來篩選物件。"];
+        return {
+          emoji: "🛵",
+          fun: "機能效率控",
+          formal: "機能效率型買方",
+          copy: "時間就是金錢，適合從商圈、交通、學校和採買便利度來篩選物件。"
+        };
       }
       if (state.priorities.includes("屋況好") || state.priorities.includes("採光通風")) {
-        return ["舒適入住型買方", "適合找屋況佳、採光通風好，整理成本較低的物件。"];
+        return {
+          emoji: "☀️",
+          fun: "陽光舒適派",
+          formal: "舒適入住型買方",
+          copy: "回家就是要放鬆，適合找屋況佳、採光通風好，整理成本較低的物件。"
+        };
       }
       if (state.budget === "800萬以下" || state.rooms === "1～2房" || hasPropertyType("套房")) {
-        return ["首購起步型買方", "適合先鎖定低總價、生活便利、負擔相對穩定的物件。"];
+        return {
+          emoji: "🌱",
+          fun: "首購新芽",
+          formal: "首購起步型買方",
+          copy: "買房路上的第一步，適合先鎖定低總價、生活便利、負擔相對穩定的物件。"
+        };
       }
-      return ["方向探索型買方", "適合先用區域、預算和生活條件抓出範圍，再慢慢比較物件。"];
+      return {
+        emoji: "🧭",
+        fun: "方向探索者",
+        formal: "方向探索型買方",
+        copy: "還在畫地圖的階段也很好，適合先用區域、預算和生活條件抓出範圍，再慢慢比較。"
+      };
     }
 
     function displayBudget() {
@@ -1969,9 +2160,10 @@
     }
 
     function renderSummary() {
-      const [name, copy] = getPersona();
-      personaName.textContent = name;
-      personaCopy.textContent = copy;
+      const persona = getPersona();
+      personaName.textContent = `${persona.emoji} ${persona.fun}`;
+      personaTag.textContent = persona.formal;
+      personaCopy.textContent = persona.copy;
 
       const readiness = getBuyerReadiness();
       readinessPanel.innerHTML = `
@@ -2033,7 +2225,7 @@
     }
 
     function getSummaryText() {
-      const [persona] = getPersona();
+      const persona = getPersona();
       const clarity = getClarityScore();
       const directAdvice = getDirectAdvice();
       const readiness = getBuyerReadiness();
@@ -2054,7 +2246,7 @@
         `風水或格局忌諱：${displayFengShui().length ? displayFengShui().join("、") : "未填"}`,
         `其他特別購屋需求或考量：${state.notes || "未填"}`,
         `同意聯繫：${state.consent ? "是" : "否"}`,
-        `買方類型：${persona}`,
+        `買方類型：${persona.emoji} ${persona.fun}（${persona.formal}）`,
         `找房方向清楚度：${clarity.total}%`,
         `看房節奏：${readiness.clientLabel}`,
         `客戶熱度：${readiness.internalLabel}（${readiness.reason}）`,
@@ -2063,7 +2255,7 @@
     }
 
     function getLeadPayload() {
-      const [persona] = getPersona();
+      const persona = getPersona();
       const clarity = getClarityScore();
       const directAdvice = getDirectAdvice();
       const readiness = getBuyerReadiness();
@@ -2086,7 +2278,7 @@
         fengShuiOther: state.fengShuiOther,
         notes: state.notes,
         consent: state.consent,
-        persona,
+        persona: `${persona.fun}（${persona.formal}）`,
         clarityScore: clarity.total,
         leadTemperature: readiness.internalLabel,
         leadTemperatureReason: readiness.reason,
@@ -2158,6 +2350,7 @@
       const step = steps[state.step];
       if (!isStepValid(step)) return;
       const nextStep = getNextStepIndex(state.step);
+      currentReaction = null;
       if (nextStep !== null) {
         state.step = nextStep;
         render();
@@ -2168,13 +2361,21 @@
 
     backBtn.addEventListener("click", () => {
       const prevStep = getPrevStepIndex(state.step);
+      currentReaction = null;
       if (prevStep !== null) {
         state.step = prevStep;
         render();
       }
     });
 
-    copyBtn.addEventListener("click", copySummary);
+    async function sendToLine() {
+      await copySummary("已複製方向卡，貼到與小魏的 LINE 對話就可以囉。");
+      window.open("https://line.me/R/ti/p/%40tainanwei", "_blank", "noopener");
+    }
+
+    document.getElementById("lineBtn").addEventListener("click", sendToLine);
+
+    copyBtn.addEventListener("click", () => copySummary());
 
     restartBtn.addEventListener("click", resetGame);
 
@@ -2202,6 +2403,7 @@
         submitted: false,
         submitError: false
       });
+      currentReaction = null;
       toast.classList.remove("show");
       render();
     }
