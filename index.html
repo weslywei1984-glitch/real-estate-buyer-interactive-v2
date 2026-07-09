@@ -847,6 +847,30 @@
       font-weight: 800;
     }
 
+    .cat-pop {
+      position: fixed;
+      z-index: 50;
+      pointer-events: none;
+      font-size: 30px;
+      line-height: 1;
+      animation: catPop 0.9s ease-out forwards;
+    }
+
+    @keyframes catPop {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, 0) scale(0.4) rotate(0deg);
+      }
+      25% {
+        opacity: 1;
+        transform: translate(-50%, -26px) scale(1.1) rotate(var(--cat-tilt, 8deg));
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -76px) scale(1) rotate(calc(var(--cat-tilt, 8deg) * -1));
+      }
+    }
+
     @keyframes reactionIn {
       from {
         opacity: 0;
@@ -2346,9 +2370,23 @@
       }
     }
 
+    function popCat(button) {
+      const cats = ["🐱", "😺", "😸", "😻", "🐈"];
+      const rect = button.getBoundingClientRect();
+      const cat = document.createElement("span");
+      cat.className = "cat-pop";
+      cat.textContent = cats[Math.floor(Math.random() * cats.length)];
+      cat.style.left = `${rect.left + rect.width / 2 + (Math.random() * 30 - 15)}px`;
+      cat.style.top = `${rect.top - 6}px`;
+      cat.style.setProperty("--cat-tilt", `${Math.random() * 24 - 12}deg`);
+      document.body.appendChild(cat);
+      setTimeout(() => cat.remove(), 950);
+    }
+
     nextBtn.addEventListener("click", () => {
       const step = steps[state.step];
       if (!isStepValid(step)) return;
+      popCat(nextBtn);
       const nextStep = getNextStepIndex(state.step);
       currentReaction = null;
       if (nextStep !== null) {
@@ -2363,6 +2401,7 @@
       const prevStep = getPrevStepIndex(state.step);
       currentReaction = null;
       if (prevStep !== null) {
+        popCat(backBtn);
         state.step = prevStep;
         render();
       }
