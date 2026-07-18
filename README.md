@@ -13,3 +13,12 @@ npm.cmd run test:ui
 正式聯絡：魏泉承｜永慶不動產-小東南紡店｜0927-617-207  
 LINE：https://line.me/R/ti/p/%40tainanwei
 
+## Backend
+
+- Source: `apps-script/Code.gs`
+- Sheet: independent C-version lead ledger
+- Source version: `buyer-diagnosis-c-v2`
+- Frontend endpoint: `src/config.js`
+
+Deployment verification must include an exact row re-read and a duplicate-submission check.
+

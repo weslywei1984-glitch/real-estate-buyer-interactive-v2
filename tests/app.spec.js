@@ -156,8 +156,9 @@ test("invalid phone cannot submit and exposes field guidance", async ({ page }) 
   await expect(page.getByRole("button", { name: "送出並查看完整方向卡" })).toBeDisabled();
 });
 
-test("placeholder backend reports an honest error and keeps answers available", async ({ page }) => {
+test("missing backend reports an honest error and keeps answers available", async ({ page }) => {
   await page.goto("/?testStep=result");
+  await page.evaluate(() => window.__buyerAppTest.configureServices({ endpoint: "" }));
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
   await page.getByLabel("手機號碼").fill("0912345678");
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
