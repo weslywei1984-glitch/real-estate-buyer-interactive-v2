@@ -17,10 +17,19 @@ const state = {
   submitting: false,
   submitError: "",
   submitAttempted: false,
-  phoneTouched: false
+  phoneTouched: false,
+  stepErrors: {},
+  stepErrorTitle: "請先完成這一題",
+  activeSubmission: null,
+  confirmedSubmission: null
 };
 
 const $ = id => document.getElementById(id);
+const services = { endpoint: BACKEND_URL, submitLead };
+const RELATED_ERROR_FIELDS = {
+  areas: ["areas", "customArea"],
+  otherNoGo: ["noGos", "otherNoGo"]
+};
 let toastTimer;
 
 function escapeHtml(value = "") {
@@ -36,10 +45,77 @@ function escapeHtml(value = "") {
   );
 }
 
-function clearFormError() {
-  const error = $("formError");
-  error.textContent = "";
-  error.removeAttribute("aria-label");
+function validationKeyForField(fieldKey) {
+  if (["areas", "customArea"].includes(fieldKey)) return "areas";
+  if (["noGos", "otherNoGo"].includes(fieldKey)) return "otherNoGo";
+  return fieldKey;
+}
+
+function clearAllStepErrors() {
+  state.stepErrors = {};
+  state.stepErrorTitle = "請先完成這一題";
+}
+
+function refreshStepErrorState(fieldKey) {
+  const validationKey = validationKeyForField(fieldKey);
+  if (!(validationKey in state.stepErrors)) return;
+  const step = QUESTION_STEPS[state.stepIndex];
+  if (!step) {
+    delete state.stepErrors[validationKey];
+    return;
+  }
+  const nextError = validateStep(step.id, state.answers).errors[validationKey];
+  if (nextError) state.stepErrors[validationKey] = nextError;
+  else delete state.stepErrors[validationKey];
+}
+
+function syncStepErrorUi() {
+  const questionArea = $("questionArea");
+  const summary = $("formError");
+  if (!questionArea || !summary) return;
+
+  questionArea.querySelectorAll("[aria-invalid]").forEach(element => {
+    element.removeAttribute("aria-invalid");
+    element.removeAttribute("aria-describedby");
+  });
+  questionArea.querySelectorAll("[data-field-error]").forEach(element => element.remove());
+
+  const entries = Object.entries(state.stepErrors);
+  if (!entries.length) {
+    summary.textContent = "";
+    summary.removeAttribute("aria-label");
+    return;
+  }
+
+  const messages = [...new Set(entries.map(([, message]) => message))];
+  summary.setAttribute("aria-label", state.stepErrorTitle);
+  summary.innerHTML = `<strong>${escapeHtml(state.stepErrorTitle)}</strong><ul>${messages.map(message => `<li>${escapeHtml(message)}</li>`).join("")}</ul>`;
+
+  for (const [errorKey, message] of entries) {
+    const relatedFields = RELATED_ERROR_FIELDS[errorKey] || [errorKey];
+    const errorId = `fieldError-${errorKey}`;
+    const targets = relatedFields.flatMap(fieldKey => [
+      questionArea.querySelector(`[data-field-group="${fieldKey}"]`),
+      questionArea.querySelector(`[data-text-field="${fieldKey}"]`)
+    ]).filter(Boolean);
+
+    targets.forEach(target => {
+      target.setAttribute("aria-invalid", "true");
+      target.setAttribute("aria-describedby", errorId);
+    });
+
+    const ownerKey = errorKey === "areas" ? "customArea" : errorKey;
+    const owner = questionArea.querySelector(`[data-text-field="${ownerKey}"]`)?.closest(".field")
+      || questionArea.querySelector(`[data-field-group="${ownerKey}"]`);
+    if (owner) {
+      const fieldError = document.createElement("span");
+      fieldError.id = errorId;
+      fieldError.className = "field-error";
+      fieldError.dataset.fieldError = errorKey;
+      fieldError.textContent = message;
+      owner.append(fieldError);
+    }
+  }
 }
 
 function focusElement(element) {
@@ -55,33 +131,27 @@ function focusChoice(field, value) {
 }
 
 function setAnswer(key, value, focusValue = value) {
+  if (state.submitting) return;
   state.answers[key] = value;
   state.answers = clearHiddenAnswers(state.answers);
+  refreshStepErrorState(key);
   render({ focus: false });
   focusChoice(key, focusValue);
 }
 
 function showStepErrors(errors, title = "請先完成這一題") {
-  const messages = [...new Set(Object.values(errors))];
-  const error = $("formError");
-  error.setAttribute("aria-label", title);
-  error.innerHTML = `<strong>${escapeHtml(title)}</strong><ul>${messages.map(message => `<li>${escapeHtml(message)}</li>`).join("")}</ul>`;
-
-  for (const key of Object.keys(errors)) {
-    const group = document.querySelector(`[data-field-group="${key}"]`);
-    const input = document.querySelector(`[data-text-field="${key}"]`);
-    group?.setAttribute("aria-invalid", "true");
-    group?.setAttribute("aria-describedby", "formError");
-    input?.setAttribute("aria-invalid", "true");
-    input?.setAttribute("aria-describedby", "formError");
-  }
-  focusElement(error);
+  state.stepErrors = { ...errors };
+  state.stepErrorTitle = title;
+  syncStepErrorUi();
+  focusElement($("formError"));
 }
 
 function goNext() {
+  if (state.submitting) return;
   if (state.stepIndex < 0) {
     state.phase = "questions";
     state.stepIndex = 0;
+    clearAllStepErrors();
     render();
     return;
   }
@@ -93,6 +163,7 @@ function goNext() {
     return;
   }
 
+  clearAllStepErrors();
   if (state.stepIndex === QUESTION_STEPS.length - 1) {
     state.phase = "result";
   } else {
@@ -102,6 +173,8 @@ function goNext() {
 }
 
 function goBack() {
+  if (state.submitting) return;
+  clearAllStepErrors();
   if (state.phase === "result") {
     state.phase = "questions";
     state.stepIndex = QUESTION_STEPS.length - 1;
@@ -114,7 +187,23 @@ function goBack() {
   render();
 }
 
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreeze);
+  return Object.freeze(value);
+}
+
+function createSubmissionSnapshot() {
+  const answers = structuredClone(clearHiddenAnswers(state.answers));
+  const result = deriveResult(answers);
+  const submissionId = crypto.randomUUID();
+  const payload = buildPayload({ answers, result, submissionId });
+  const summary = buildSummary({ answers, result });
+  return deepFreeze({ answers, result, payload, summary });
+}
+
 async function handleSubmit() {
+  if (state.submitting) return;
   state.phoneTouched = true;
   updateSubmitState();
 
@@ -132,24 +221,24 @@ async function handleSubmit() {
   }
 
   state.submitAttempted = true;
-  if (!BACKEND_URL) {
+  if (!services.endpoint) {
     state.submitError = "尚未設定獨立後端，資料還沒有送出。您可以保留答案，或先用 LINE 聯絡小魏。";
     render({ focus: false });
     focusElement($("submitError"));
     return;
   }
 
+  const endpoint = services.endpoint;
+  const submit = services.submitLead;
+  const snapshot = createSubmissionSnapshot();
+  state.activeSubmission = snapshot;
   state.submitting = true;
   state.submitError = "";
   render({ focus: false });
-  const result = deriveResult(state.answers);
-  const submissionId = crypto.randomUUID();
 
   try {
-    await submitLead({
-      endpoint: BACKEND_URL,
-      payload: buildPayload({ answers: state.answers, result, submissionId })
-    });
+    await submit({ endpoint, payload: snapshot.payload });
+    state.confirmedSubmission = snapshot;
     state.phase = "complete";
   } catch (error) {
     state.submitError = error.code === "SUBMISSION_NOT_CONFIRMED"
@@ -157,13 +246,16 @@ async function handleSubmit() {
       : "目前無法送出，答案已保留。請重新送出、複製摘要或改用 LINE。";
   } finally {
     state.submitting = false;
+    if (state.phase !== "complete") state.activeSubmission = null;
     render({ focus: state.phase === "complete" });
     if (state.phase !== "complete") focusElement($("submitError"));
   }
 }
 
 async function copySummary() {
-  const text = buildSummary({ answers: state.answers, result: deriveResult(state.answers) });
+  const snapshot = state.phase === "complete" ? state.confirmedSubmission : state.activeSubmission;
+  const text = snapshot?.summary
+    || buildSummary({ answers: state.answers, result: deriveResult(state.answers) });
   try {
     await navigator.clipboard.writeText(text);
     showToast("需求摘要已複製");
@@ -180,12 +272,13 @@ function fieldIsVisible(field) {
 
 function renderField(field) {
   if (!fieldIsVisible(field)) return "";
+  const disabled = state.submitting ? " disabled" : "";
 
   if (field.type === "text") {
     const inputId = `field-${field.key}`;
     return `<label class="field" for="${inputId}">
       <span>${escapeHtml(field.label)}</span>
-      <input id="${inputId}" data-text-field="${field.key}" value="${escapeHtml(state.answers[field.key])}" placeholder="${escapeHtml(field.placeholder)}" autocomplete="off">
+      <input id="${inputId}" data-text-field="${field.key}" value="${escapeHtml(state.answers[field.key])}" placeholder="${escapeHtml(field.placeholder)}" autocomplete="off"${disabled}>
     </label>`;
   }
 
@@ -196,7 +289,7 @@ function renderField(field) {
     <div class="choice-grid">
       ${field.options.map(option => {
         const selected = values.includes(option);
-        return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}">${escapeHtml(option)}</button>`;
+        return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}"${disabled}>${escapeHtml(option)}</button>`;
       }).join("")}
     </div>
   </fieldset>`;
@@ -205,8 +298,8 @@ function renderField(field) {
 function bindQuestionEvents() {
   document.querySelectorAll("[data-field]").forEach(button => {
     button.addEventListener("click", () => {
+      if (state.submitting) return;
       const { field, type, value, max, exclusive } = button.dataset;
-      clearFormError();
 
       if (type === "single") {
         setAnswer(field, value);
@@ -233,9 +326,12 @@ function bindQuestionEvents() {
 
   document.querySelectorAll("[data-text-field]").forEach(input => {
     input.addEventListener("input", event => {
-      state.answers[event.currentTarget.dataset.textField] = event.currentTarget.value;
+      if (state.submitting) return;
+      const fieldKey = event.currentTarget.dataset.textField;
+      state.answers[fieldKey] = event.currentTarget.value;
       state.answers = clearHiddenAnswers(state.answers);
-      clearFormError();
+      refreshStepErrorState(fieldKey);
+      syncStepErrorUi();
     });
   });
 }
@@ -280,11 +376,13 @@ function renderQuestion({ focus = true } = {}) {
     <div class="advisor-tip"><strong>小魏提醒：</strong>${escapeHtml(step.tip)}</div>
     ${step.fields.map(renderField).join("")}
   </article>`;
-  clearFormError();
   $("backButton").onclick = goBack;
   $("nextButton").onclick = goNext;
+  $("backButton").disabled = state.submitting;
+  $("nextButton").disabled = state.submitting;
   $("nextButton").textContent = state.stepIndex === QUESTION_STEPS.length - 1 ? "查看方向" : "下一題";
   bindQuestionEvents();
+  syncStepErrorUi();
   if (focus) focusElement($("questionArea").querySelector("h2"));
 }
 
@@ -301,19 +399,23 @@ function resultPreview(result) {
 
 function bindContactEvents() {
   $("name").addEventListener("input", event => {
+    if (state.submitting) return;
     state.answers.name = event.target.value;
     updateSubmitState();
   });
   $("phone").addEventListener("input", event => {
+    if (state.submitting) return;
     state.answers.phone = event.target.value;
     state.phoneTouched = true;
     updateSubmitState();
   });
   $("phone").addEventListener("blur", () => {
+    if (state.submitting) return;
     state.phoneTouched = true;
     updateSubmitState();
   });
   $("consent").addEventListener("change", event => {
+    if (state.submitting) return;
     state.answers.consent = event.target.checked;
     updateSubmitState();
   });
@@ -345,7 +447,8 @@ function renderResult({ focus = true } = {}) {
   $("hero").hidden = true;
   $("wizard").hidden = true;
   $("resultArea").hidden = false;
-  const result = deriveResult(state.answers);
+  const result = state.activeSubmission?.result || deriveResult(state.answers);
+  const locked = state.submitting ? " disabled" : "";
   const buttonLabel = state.submitting
     ? "確認資料入表中…"
     : state.submitAttempted && state.submitError
@@ -358,17 +461,17 @@ function renderResult({ focus = true } = {}) {
       <h3>把完整方向卡整理給您</h3>
       <p class="contact-intro">送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
       <div class="contact-grid">
-        <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required></label>
-        <label class="field" for="phone"><span>手機號碼</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required><span class="field-guidance" id="phoneGuidance"></span></label>
+        <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}></label>
+        <label class="field" for="phone"><span>手機號碼</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
       </div>
-      <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}><span>我同意由小魏依這份結果與我聯繫</span></label>
+      <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}${locked}><span>我同意由小魏依這份結果與我聯繫</span></label>
       <div class="form-error" id="submitError" role="alert" tabindex="-1">${escapeHtml(state.submitError)}</div>
       <div class="submit-row">
         <button class="primary" id="submitButton" type="submit">${buttonLabel}</button>
         <p class="submit-state" id="submitState" role="status">${state.submitting ? "正在送出，並確認資料是否已入表，請稍候。" : "送出期間請不要關閉頁面。"}</p>
       </div>
       <div class="fallback-actions">
-        <button id="resultBack" type="button">回上一步</button>
+        <button id="resultBack" type="button"${locked}>回上一步</button>
         <button id="copyButton" type="button">複製需求摘要</button>
         <a href="${LINE_URL}" target="_blank" rel="noopener">改用 LINE 聯絡</a>
       </div>
@@ -382,7 +485,13 @@ function renderComplete({ focus = true } = {}) {
   $("hero").hidden = true;
   $("wizard").hidden = true;
   $("resultArea").hidden = false;
-  const result = deriveResult(state.answers);
+  const snapshot = state.confirmedSubmission;
+  if (!snapshot) {
+    state.phase = "result";
+    renderResult({ focus });
+    return;
+  }
+  const result = snapshot.result;
   $("resultArea").innerHTML = `${resultPreview(result)}
     <section class="result-card">
       <div class="complete-seal" aria-hidden="true">✓</div>
@@ -436,7 +545,23 @@ function applyLocalTestShortcut() {
   }
 }
 
+function configureServices({ endpoint, submitLead: submitImplementation } = {}) {
+  if (!new Set(["localhost", "127.0.0.1"]).has(location.hostname)) return;
+  if (state.submitting) throw new Error("cannot reconfigure services while submitting");
+  if (typeof endpoint === "string") services.endpoint = endpoint;
+  if (typeof submitImplementation === "function") services.submitLead = submitImplementation;
+}
+
+function syncGlobalBusyState() {
+  $("app").setAttribute("aria-busy", String(state.submitting));
+  const brand = document.querySelector(".brand");
+  brand.setAttribute("aria-disabled", String(state.submitting));
+  brand.classList.toggle("disabled", state.submitting);
+  brand.tabIndex = state.submitting ? -1 : 0;
+}
+
 function render(options = {}) {
+  syncGlobalBusyState();
   if (state.phase === "intro") {
     renderIntro(options);
     return;
@@ -460,6 +585,9 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
-window.__buyerAppTest = { state, setAnswer, goNext, goBack, handleSubmit, render };
+document.querySelector(".brand").addEventListener("click", event => {
+  if (state.submitting) event.preventDefault();
+});
+window.__buyerAppTest = { state, setAnswer, goNext, goBack, handleSubmit, render, configureServices };
 applyLocalTestShortcut();
 render();

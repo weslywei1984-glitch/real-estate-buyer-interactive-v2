@@ -1,5 +1,41 @@
 import { test, expect } from "@playwright/test";
 
+async function installDeferredSubmissionMock(page) {
+  await page.evaluate(() => {
+    window.__submitCalls = 0;
+    window.__buyerAppTest.configureServices({
+      endpoint: "https://example.test/confirmed-submit",
+      submitLead: ({ payload }) => {
+        window.__submitCalls += 1;
+        window.__capturedPayload = structuredClone(payload);
+        return new Promise((resolve, reject) => {
+          window.__submissionControl = { resolve, reject };
+        });
+      }
+    });
+  });
+}
+
+async function fillValidContact(page) {
+  await page.getByLabel("怎麼稱呼您？").fill("王小姐");
+  await page.getByLabel("手機號碼").fill("0912345678");
+  await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
+}
+
+function relativeLuminance(color) {
+  const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(channel => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastRatio(first, second) {
+  const light = Math.max(relativeLuminance(first), relativeLuminance(second));
+  const dark = Math.min(relativeLuminance(first), relativeLuminance(second));
+  return (light + 0.05) / (dark + 0.05);
+}
+
 async function completeQuestionnaire(page) {
   await page.goto("/");
   await page.getByRole("button", { name: "開始整理" }).click();
@@ -118,6 +154,123 @@ test("placeholder backend reports an honest error and keeps answers available", 
   await expect(page.getByRole("alert")).toContainText("尚未設定獨立後端，資料還沒有送出");
   await expect(page.getByLabel("怎麼稱呼您？")).toHaveValue("王小姐");
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
+});
+
+test("submission locks mutable controls and confirmed success uses the immutable snapshot", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async text => { window.__copiedSummary = text; } }
+    });
+  });
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+
+  await expect(page.getByRole("button", { name: "確認資料入表中…" })).toBeDisabled();
+  await expect(page.locator("#leadForm")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByLabel("怎麼稱呼您？")).toBeDisabled();
+  await expect(page.getByLabel("手機號碼")).toBeDisabled();
+  await expect(page.getByLabel("我同意由小魏依這份結果與我聯繫")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "回上一步" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "回到買房方向診斷首頁" })).toHaveAttribute("aria-disabled", "true");
+
+  await page.evaluate(() => {
+    const name = document.querySelector("#name");
+    name.value = "等待時竄改";
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+    window.__buyerAppTest.state.answers.areas = ["東區"];
+    window.__buyerAppTest.handleSubmit();
+  });
+
+  await expect.poll(() => page.evaluate(() => window.__submitCalls)).toBe(1);
+  await page.evaluate(() => window.__submissionControl.resolve({ ok: true, submissionId: window.__capturedPayload.submissionId }));
+
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+  await expect(page.getByText("先以永康區為主要範圍，配合工作通勤比較實際動線。")).toBeVisible();
+  await expect(page.getByText("先以東區為主要範圍，配合工作通勤比較實際動線。")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__capturedPayload)).toMatchObject({
+    name: "王小姐",
+    areas: ["永康區"]
+  });
+
+  await page.getByRole("button", { name: "複製需求摘要" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("區域：永康區");
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("區域：東區");
+});
+
+test("submission error unlocks controls and preserves contact answers for retry", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await expect(page.getByLabel("怎麼稱呼您？")).toBeDisabled();
+  await page.evaluate(() => {
+    const error = new Error("confirmation timeout");
+    error.code = "SUBMISSION_NOT_CONFIRMED";
+    window.__submissionControl.reject(error);
+  });
+
+  await expect(page.getByRole("alert")).toContainText("資料尚未確認入表");
+  await expect(page.locator("#leadForm")).toHaveAttribute("aria-busy", "false");
+  await expect(page.getByLabel("怎麼稱呼您？")).toBeEnabled();
+  await expect(page.getByLabel("怎麼稱呼您？")).toHaveValue("王小姐");
+  await expect(page.getByLabel("手機號碼")).toBeEnabled();
+  await expect(page.getByLabel("手機號碼")).toHaveValue("0912345678");
+  await expect(page.getByRole("button", { name: "回上一步" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
+});
+
+test("correcting related text fields clears field-level ARIA errors", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始整理" }).click();
+  await page.getByRole("button", { name: "自住", exact: true }).click();
+  await page.getByRole("button", { name: "3個月內", exact: true }).click();
+  await page.getByRole("button", { name: "下一題" }).click();
+  await page.getByRole("button", { name: "下一題" }).click();
+
+  const areas = page.locator('[data-field-group="areas"]');
+  const customArea = page.getByLabel("其他區域");
+  await expect(areas).toHaveAttribute("aria-invalid", "true");
+  await expect(customArea).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator('[data-field-error="areas"]')).toHaveCount(1);
+
+  await customArea.fill("東橋");
+  await expect(areas).not.toHaveAttribute("aria-invalid");
+  await expect(areas).not.toHaveAttribute("aria-describedby");
+  await expect(customArea).not.toHaveAttribute("aria-invalid");
+  await expect(customArea).not.toHaveAttribute("aria-describedby");
+  await expect(page.locator('[data-field-error="areas"]')).toHaveCount(0);
+  await expect(page.locator('[data-field-group="lifeFocus"]')).toHaveAttribute("aria-invalid", "true");
+
+  await page.goto("/?testStep=priorities");
+  await page.getByRole("button", { name: "其他", exact: true }).click();
+  await page.getByRole("button", { name: "查看方向" }).click();
+  const noGos = page.locator('[data-field-group="noGos"]');
+  const otherNoGo = page.getByLabel("其他避開條件");
+  await expect(noGos).toHaveAttribute("aria-invalid", "true");
+  await expect(otherNoGo).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator('[data-field-error="otherNoGo"]')).toHaveCount(1);
+
+  await otherNoGo.fill("不要面高架道路");
+  await expect(noGos).not.toHaveAttribute("aria-invalid");
+  await expect(noGos).not.toHaveAttribute("aria-describedby");
+  await expect(otherNoGo).not.toHaveAttribute("aria-invalid");
+  await expect(otherNoGo).not.toHaveAttribute("aria-describedby");
+  await expect(page.locator('[data-field-error="otherNoGo"]')).toHaveCount(0);
+});
+
+test("focus indicator has at least 3 to 1 contrast on both card backgrounds", async ({ page }) => {
+  await page.goto("/");
+  const start = page.getByRole("button", { name: "開始整理" });
+  await start.focus();
+  const outlineColor = await start.evaluate(element => getComputedStyle(element).outlineColor);
+
+  expect(contrastRatio(outlineColor, "rgb(255, 253, 248)")).toBeGreaterThanOrEqual(3);
+  expect(contrastRatio(outlineColor, "rgb(247, 241, 230)")).toBeGreaterThanOrEqual(3);
 });
 
 test("copies the demand summary and exposes the real LINE contact", async ({ page }) => {
