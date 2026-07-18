@@ -44,6 +44,79 @@ test("flags unclear third-room use without judging the buyer", () => {
   assert.ok(result.videoQuestions.some(item => item.ep === 7 && item.relevant));
 });
 
+test("selects only three to five relevant viewing questions for every result", () => {
+  const branches = [
+    complete,
+    {
+      ...complete,
+      timeline: "先看看",
+      downPayment: "還不確定",
+      monthlyMortgage: "希望小魏協助試算",
+      rooms: "2房",
+      thirdRoomUse: "",
+      lifeFocus: "無固定地點",
+      mustHaves: ["價格"]
+    },
+    {
+      ...complete,
+      timeline: "1個月內",
+      rooms: "2房",
+      thirdRoomUse: "",
+      mustHaves: ["格局"]
+    }
+  ];
+
+  for (const answers of branches) {
+    const relevantCount = deriveResult(answers).videoQuestions.filter(item => item.relevant).length;
+    assert.ok(relevantCount >= 3 && relevantCount <= 5, `relevant count was ${relevantCount}`);
+  }
+});
+
+test("changes relevant episodes deterministically for different buyer needs", () => {
+  const unclearRoom = deriveResult(complete).videoQuestions.filter(item => item.relevant).map(item => item.ep);
+  const unclearBudget = deriveResult({
+    ...complete,
+    timeline: "先看看",
+    downPayment: "還不確定",
+    monthlyMortgage: "希望小魏協助試算",
+    rooms: "2房",
+    thirdRoomUse: "",
+    lifeFocus: "無固定地點",
+    mustHaves: ["價格"]
+  }).videoQuestions.filter(item => item.relevant).map(item => item.ep);
+  const nearTerm = deriveResult({
+    ...complete,
+    timeline: "1個月內",
+    rooms: "2房",
+    thirdRoomUse: "",
+    mustHaves: ["格局"]
+  }).videoQuestions.filter(item => item.relevant).map(item => item.ep);
+
+  assert.ok(unclearRoom.includes(7), "unclear third-room use should prioritize EP7");
+  assert.ok(unclearRoom.includes(3), "commute/life-circle answers should prioritize EP3");
+  assert.ok(unclearRoom.includes(6), "quiet/parking answers should prioritize EP6");
+  assert.ok(unclearBudget.includes(1), "unclear budget should prioritize EP1");
+  assert.ok(unclearBudget.includes(5), "unclear budget should prioritize EP5");
+  assert.ok(nearTerm.includes(4), "near-term buying should prioritize EP4");
+  assert.notDeepEqual(unclearRoom, unclearBudget);
+  assert.notDeepEqual(unclearBudget, nearTerm);
+});
+
+test("includes purchase purpose and timing in the direction summary", () => {
+  const result = deriveResult({ ...complete, purpose: "換屋", timeline: "1個月內" });
+  const direction = result.direction.join(" ");
+
+  assert.match(direction, /換屋/);
+  assert.match(direction, /1個月內/);
+});
+
+test("keeps living buffer and repair or holding costs in the budget reminder", () => {
+  const reminder = deriveResult(complete).budgetReminder;
+
+  assert.match(reminder, /生活.*餘裕|生活預備金|生活緩衝/);
+  assert.match(reminder, /修繕|持有成本|管理費/);
+});
+
 test("uses neutral readiness labels only", () => {
   const result = deriveResult({ ...complete, timeline: "先看看", areas: [] });
   assert.ok(["方向探索中", "條件整理中", "可以開始精準比較"].includes(result.status));

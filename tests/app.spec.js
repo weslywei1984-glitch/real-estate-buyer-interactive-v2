@@ -213,6 +213,35 @@ test("submission locks mutable controls and confirmed success uses the immutable
   await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("區域：東區");
 });
 
+test("confirmed result has seven keyboard-toggleable viewing checklist items", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+
+  const checklist = page.getByRole("group", { name: "看屋前，問自己這 7 題" });
+  const checkboxes = checklist.getByRole("checkbox");
+  await expect(checkboxes).toHaveCount(7);
+
+  const relevantCount = await checklist.locator('[data-relevant="true"]').count();
+  expect(relevantCount).toBeGreaterThanOrEqual(3);
+  expect(relevantCount).toBeLessThanOrEqual(5);
+
+  const payloadBeforeToggle = await page.evaluate(() => structuredClone(window.__capturedPayload));
+  const firstQuestion = checkboxes.nth(0);
+  await expect(firstQuestion).not.toBeChecked();
+  await firstQuestion.focus();
+  await page.keyboard.press("Space");
+  await expect(firstQuestion).toBeChecked();
+  await expect.poll(() => page.evaluate(() => window.__submitCalls)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__capturedPayload)).toEqual(payloadBeforeToggle);
+});
+
 test("submission error unlocks controls and preserves contact answers for retry", async ({ page }) => {
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);

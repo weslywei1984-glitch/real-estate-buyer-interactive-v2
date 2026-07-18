@@ -504,8 +504,16 @@ function renderComplete({ focus = true } = {}) {
       <p>資料已確認入表，小魏會依這份方向與您聯繫。以下清單也可以先保存，之後看屋時逐項確認。</p>
       <h3>最適合您的看屋策略</h3>
       <ul class="strategy-list">${result.strategy.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      <h3>看屋前，問自己這 7 題</h3>
-      <ol class="video-list">${result.videoQuestions.map(item => `<li class="${item.relevant ? "relevant" : ""}">${escapeHtml(item.text)}</li>`).join("")}</ol>
+      <fieldset class="video-list">
+        <legend>看屋前，問自己這 7 題</legend>
+        <div class="video-list-items">${result.videoQuestions.map(item => `
+          <label class="video-check-item ${item.relevant ? "relevant" : ""}" data-relevant="${item.relevant}">
+            <input type="checkbox">
+            <span class="video-question-text">${escapeHtml(item.text)}</span>
+            ${item.relevant ? '<span class="video-relevant-badge">優先確認</span>' : ""}
+          </label>`).join("")}
+        </div>
+      </fieldset>
       <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店｜<a href="tel:${PHONE.replaceAll("-", "")}">${PHONE}</a></p>
       <div class="fallback-actions">
         <button id="copyButton" type="button">複製需求摘要</button>
