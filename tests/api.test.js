@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadStatusWithJsonp, submitLead } from "../src/api.js";
 
+async function settleWithin(promise, maxMs) {
+  return Promise.race([
+    promise.then(
+      value => ({ state: "resolved", value }),
+      error => ({ state: "rejected", error })
+    ),
+    new Promise(resolve => setTimeout(() => resolve({ state: "pending" }), maxMs))
+  ]);
+}
+
 test("posts once and confirms the submission id", async () => {
   const calls = [];
   const result = await submitLead({
@@ -42,6 +52,41 @@ test("throws a typed timeout when the row cannot be confirmed", async () => {
   );
 });
 
+test("bounds a hanging status loader by the confirmation deadline", async () => {
+  let loaderOptions;
+  let rejectLate;
+  const unhandled = [];
+  const captureUnhandled = reason => unhandled.push(reason);
+  const startedAt = performance.now();
+
+  process.on("unhandledRejection", captureUnhandled);
+  try {
+    const outcome = await settleWithin(submitLead({
+      endpoint: "https://script.google.com/macros/s/example/exec",
+      payload: { submissionId: "sub-hang" },
+      fetchImpl: async () => ({ type: "opaque" }),
+      statusLoader: (_url, options) => new Promise((_resolve, reject) => {
+        loaderOptions = options;
+        rejectLate = reject;
+      }),
+      timeoutMs: 25,
+      pollIntervalMs: 100
+    }), 150);
+
+    assert.equal(outcome.state, "rejected");
+    assert.equal(outcome.error.code, "SUBMISSION_NOT_CONFIRMED");
+    assert.ok(performance.now() - startedAt < 150);
+    assert.equal(loaderOptions.signal.aborted, true);
+
+    rejectLate(new Error("late status failure"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    if (rejectLate) rejectLate(new Error("test cleanup"));
+    process.off("unhandledRejection", captureUnhandled);
+  }
+});
+
 test("keeps polling after a JSONP status load failure", async () => {
   let attempts = 0;
   const result = await submitLead({
@@ -59,6 +104,42 @@ test("keeps polling after a JSONP status load failure", async () => {
 
   assert.equal(attempts, 2);
   assert.deepEqual(result, { ok: true, submissionId: "sub-retry" });
+});
+
+test("cleans JSONP callback and script when an abort signal ends status loading", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const controller = new AbortController();
+  let appendedScript;
+  let removed = 0;
+
+  globalThis.window = {};
+  globalThis.document = {
+    createElement: () => ({ remove: () => { removed += 1; } }),
+    head: { append: script => { appendedScript = script; } }
+  };
+
+  let pending;
+  let callback;
+  try {
+    pending = loadStatusWithJsonp(
+      "https://script.google.com/macros/s/example/exec?action=status",
+      { signal: controller.signal }
+    );
+    callback = new URL(appendedScript.src).searchParams.get("callback");
+    controller.abort();
+
+    const outcome = await settleWithin(pending, 50);
+    assert.equal(outcome.state, "rejected");
+    assert.match(outcome.error.message, /status aborted/);
+    assert.equal(globalThis.window[callback], undefined);
+    assert.equal(removed, 1);
+  } finally {
+    if (globalThis.window?.[callback]) appendedScript.onerror();
+    await pending?.catch(() => {});
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+  }
 });
 
 test("removes JSONP callback and script after a successful status response", async () => {

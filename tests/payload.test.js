@@ -69,5 +69,5 @@ test("builds a readable summary from buyer answers and diagnosis", () => {
   assert.match(summary, /東區、北區/);
   assert.match(summary, /可開始找房/);
   assert.match(summary, /先安排生活圈帶看/);
-  assert.match(summary, /0927-617-207/);
+  assert.match(summary, /台南小魏 買厝作伙｜魏泉承｜0927-617-207/);
 });

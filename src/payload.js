@@ -48,6 +48,6 @@ export function buildSummary({ answers, result }) {
     `必備：${(answers.mustHaves || []).join("、") || "未填"}`,
     `目前狀態：${result.status}`,
     ...result.strategy.map(item => `• ${item}`),
-    "想進一步聊聊？歡迎來電：0927-617-207"
+    "台南小魏 買厝作伙｜魏泉承｜0927-617-207"
   ].join("\n");
 }
