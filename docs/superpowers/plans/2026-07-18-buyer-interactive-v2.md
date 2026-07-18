@@ -15,7 +15,7 @@
 - The expected production URL is `https://weslywei1984-glitch.github.io/real-estate-buyer-interactive-v2/`.
 - Use a new Google Sheet, a new Apps Script project/deployment, and source version `buyer-diagnosis-c-v2`.
 - Keep production framework-free and dependency-free; development-only Playwright is allowed.
-- The required flow is six question screens plus one result/contact screen; only the third-room question may appear conditionally.
+- The required flow is six question screens plus one result/contact screen. Per decision B (2026-07-18), third-room use remains the only conditional follow-up that changes core question content. Selecting "其他" for no-gos may reveal `otherNoGo` only as an inline explanatory field within the sixth `priorities` screen; it is not an additional question screen and must not create a seventh question screen.
 - Use Traditional Chinese, deep ink green, warm ivory, and restrained gold; preserve the C-version consultant-card direction.
 - Use the real LINE URL `https://line.me/R/ti/p/%40tainanwei` and the real contact block: 魏泉承, 永慶不動產-小東南紡店, 0927-617-207.
 - Never claim a bank approval, exact loan amount, guaranteed price, return, or property fact that the supplied answers cannot support.
@@ -229,7 +229,7 @@ Expected: only V2-local setup and approved documentation are committed.
   - `clearHiddenAnswers(answers: Answers): Answers`
   - `validateStep(stepId: string, answers: Answers): { valid: boolean, errors: Record<string, string> }`
 
-- [ ] **Step 1: Write failing tests for the six required steps and conditional third-room field**
+- [ ] **Step 1: Write failing tests for the six required steps, conditional third-room field, and inline other-no-go field**
 
 Create `tests/questions.test.js`:
 
@@ -772,7 +772,7 @@ git commit -m "feat: add confirmed lead submission contract"
 
 **Interfaces:**
 - Consumes: every public function from Tasks 2–4 and `BACKEND_URL` from `src/config.js`.
-- Produces: the complete six-step wizard, conditionally rendered third-room field, preview/result/contact page, copy fallback, LINE link, keyboard support, and responsive UI.
+- Produces: the complete six-step wizard, conditionally rendered third-room field, inline `otherNoGo` field within the sixth priorities screen, preview/result/contact page, copy fallback, LINE link, keyboard support, and responsive UI; no seventh question screen.
 
 - [ ] **Step 1: Write failing browser tests for the complete path**
 
