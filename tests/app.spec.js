@@ -65,6 +65,17 @@ async function completeQuestionnaire(page) {
   await page.getByRole("button", { name: "查看方向" }).click();
 }
 
+test("buyer test hook exists only on exact local hostnames", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => typeof window.__buyerAppTest)).toBe("object");
+
+  await page.goto("http://localhost:4173/");
+  await expect.poll(() => page.evaluate(() => typeof window.__buyerAppTest)).toBe("object");
+
+  await page.goto("http://production.localhost:4173/");
+  await expect.poll(() => page.evaluate(() => typeof window.__buyerAppTest)).toBe("undefined");
+});
+
 test("completes the six-screen path and reveals the result/contact page", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "找到適合生活的房子，從問對問題開始。" })).toBeVisible();

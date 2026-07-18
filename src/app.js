@@ -26,11 +26,16 @@ const state = {
 
 const $ = id => document.getElementById(id);
 const services = { endpoint: BACKEND_URL, submitLead };
+const LOCAL_TEST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
 const RELATED_ERROR_FIELDS = {
   areas: ["areas", "customArea"],
   otherNoGo: ["noGos", "otherNoGo"]
 };
 let toastTimer;
+
+function isLocalTestHost() {
+  return LOCAL_TEST_HOSTNAMES.has(location.hostname);
+}
 
 function escapeHtml(value = "") {
   return String(value).replace(
@@ -512,7 +517,7 @@ function renderComplete({ focus = true } = {}) {
 }
 
 function applyLocalTestShortcut() {
-  if (!new Set(["localhost", "127.0.0.1"]).has(location.hostname)) return;
+  if (!isLocalTestHost()) return;
   const target = new URLSearchParams(location.search).get("testStep");
   if (!target) return;
 
@@ -546,7 +551,7 @@ function applyLocalTestShortcut() {
 }
 
 function configureServices({ endpoint, submitLead: submitImplementation } = {}) {
-  if (!new Set(["localhost", "127.0.0.1"]).has(location.hostname)) return;
+  if (!isLocalTestHost()) return;
   if (state.submitting) throw new Error("cannot reconfigure services while submitting");
   if (typeof endpoint === "string") services.endpoint = endpoint;
   if (typeof submitImplementation === "function") services.submitLead = submitImplementation;
@@ -588,6 +593,8 @@ function showToast(message) {
 document.querySelector(".brand").addEventListener("click", event => {
   if (state.submitting) event.preventDefault();
 });
-window.__buyerAppTest = { state, setAnswer, goNext, goBack, handleSubmit, render, configureServices };
+if (isLocalTestHost()) {
+  window.__buyerAppTest = { state, setAnswer, goNext, goBack, handleSubmit, render, configureServices };
+}
 applyLocalTestShortcut();
 render();
