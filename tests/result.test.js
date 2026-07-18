@@ -15,6 +15,28 @@ test("always exposes all seven video-derived questions", () => {
   assert.deepEqual(VIDEO_QUESTIONS.map(item => item.ep), [1, 2, 3, 4, 5, 6, 7]);
 });
 
+test("covers the required viewing themes in every episode", () => {
+  const questionByEp = Object.fromEntries(VIDEO_QUESTIONS.map(item => [item.ep, item.text]));
+
+  assert.match(questionByEp[1], /看屋前/);
+  assert.match(questionByEp[1], /總預算/);
+  assert.match(questionByEp[1], /可負擔範圍/);
+  assert.match(questionByEp[2], /裝潢/);
+  assert.match(questionByEp[2], /格局/);
+  assert.match(questionByEp[3], /室外環境/);
+  assert.match(questionByEp[3], /通勤/);
+  assert.match(questionByEp[3], /生活圈/);
+  assert.match(questionByEp[4], /價格/);
+  assert.match(questionByEp[4], /必要條件/);
+  assert.match(questionByEp[5], /完整成本/);
+  assert.match(questionByEp[5], /生活緩衝|生活預備金/);
+  assert.match(questionByEp[6], /白天/);
+  assert.match(questionByEp[6], /晚上/);
+  assert.match(questionByEp[6], /周邊環境/);
+  assert.match(questionByEp[7], /第三房/);
+  assert.match(questionByEp[7], /準備拿來做什麼/);
+});
+
 test("flags unclear third-room use without judging the buyer", () => {
   const result = deriveResult(complete);
   assert.ok(["方向探索中", "條件整理中", "可以開始精準比較"].includes(result.status));
