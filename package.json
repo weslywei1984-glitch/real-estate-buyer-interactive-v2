@@ -1,0 +1,14 @@
+{
+  "name": "real-estate-buyer-interactive-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:ui": "playwright test",
+    "test:all": "npm run test && npm run test:ui",
+    "serve": "python -m http.server 4173"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

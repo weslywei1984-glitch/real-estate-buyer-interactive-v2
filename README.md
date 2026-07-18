@@ -1,8 +1,15 @@
-# 買房需求互動頁
+# 台南小魏｜買房方向診斷 C 版
 
-這個專案是房地產買方需求互動頁，可透過 GitHub Pages 對外開啟。
+獨立於舊版的買方需求互動頁。正式環境使用 GitHub Pages；名單寫入獨立的 Google Sheet。
 
-- `index.html`：給客戶填寫的互動網頁
-- `buyer-interactive.html`：本機編輯版
-- `google-apps-script-backend.js`：Google Apps Script 後端，用來把客戶資料寫入 Google 試算表
+## Local checks
+
+```powershell
+npm.cmd install
+npm.cmd test
+npm.cmd run test:ui
+```
+
+正式聯絡：魏泉承｜永慶不動產-小東南紡店｜0927-617-207  
+LINE：https://line.me/R/ti/p/%40tainanwei
 
