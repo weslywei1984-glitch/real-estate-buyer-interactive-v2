@@ -9,6 +9,7 @@ import {
 import { deriveResult } from "./result.js";
 import { buildPayload, buildSummary, isTaiwanMobile } from "./payload.js";
 import { submitLead } from "./api.js";
+import { randomId } from "./random.js";
 import { BACKEND_URL, LINE_URL, PHONE } from "./config.js";
 
 const state = {
@@ -204,7 +205,7 @@ function deepFreeze(value) {
 function createSubmissionSnapshot() {
   const answers = structuredClone(clearHiddenAnswers(state.answers));
   const result = deriveResult(answers);
-  const submissionId = crypto.randomUUID();
+  const submissionId = randomId();
   const payload = buildPayload({ answers, result, submissionId });
   const summary = buildSummary({ answers, result });
   return deepFreeze({ answers, result, payload, summary });
@@ -245,7 +246,15 @@ async function handleSubmit() {
 
   const endpoint = services.endpoint;
   const submit = services.submitLead;
-  const snapshot = createSubmissionSnapshot();
+
+  let snapshot;
+  try {
+    snapshot = createSubmissionSnapshot();
+  } catch {
+    // 寧可講出來，也不要讓按鈕按下去毫無反應。
+    reportSubmitBlocked("目前無法整理這份方向卡，請重新整理頁面再送出一次，或改用 LINE 聯絡小魏。", "submitError");
+    return;
+  }
   state.activeSubmission = snapshot;
   state.submitting = true;
   state.submitError = "";

@@ -165,6 +165,29 @@ test("invalid phone cannot submit and exposes field guidance", async ({ page }) 
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
 });
 
+test("submits even without crypto.randomUUID, as on a plain http origin", async ({ page }) => {
+  // 憑證還沒發下來時網站走 http，非安全情境沒有 crypto.randomUUID。
+  // 少了備援，送出按鈕會丟例外並且完全沒有反應。
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(Object.getPrototypeOf(crypto), "randomUUID");
+    crypto.randomUUID = undefined;
+  });
+  await page.goto("/?testStep=result");
+  await expect.poll(() => page.evaluate(() => typeof crypto.randomUUID)).toBe("undefined");
+
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+
+  await expect(page.getByRole("button", { name: "確認資料入表中…" })).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => window.__submitCalls)).toBe(1);
+  const submissionId = await page.evaluate(() => window.__capturedPayload.submissionId);
+  expect(submissionId).toMatch(/^[0-9a-f-]{16,64}$/i);
+
+  await page.evaluate(id => window.__submissionControl.resolve({ ok: true, submissionId: id }), submissionId);
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+});
+
 test("every missing contact field names itself instead of silently doing nothing", async ({ page }) => {
   await page.goto("/?testStep=result");
   const submit = page.getByRole("button", { name: "送出並查看完整方向卡" });

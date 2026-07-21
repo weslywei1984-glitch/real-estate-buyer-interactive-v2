@@ -1,6 +1,8 @@
+import { randomId } from "./random.js";
+
 export function loadStatusWithJsonp(url, { timeoutMs = 5000, signal } = {}) {
   return new Promise((resolve, reject) => {
-    const callback = `buyerStatus_${crypto.randomUUID().replaceAll("-", "")}`;
+    const callback = `buyerStatus_${randomId().replaceAll("-", "")}`;
     const script = document.createElement("script");
     let settled = false;
     let timer;
