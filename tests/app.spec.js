@@ -188,6 +188,25 @@ test("submits even without crypto.randomUUID, as on a plain http origin", async 
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
 });
 
+test("the confirmed page offers a one-tap call and the result page does not", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await expect(page.getByRole("link", { name: /直接撥打/ })).toHaveCount(0);
+
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+
+  const call = page.getByRole("link", { name: /直接撥打/ });
+  await expect(call).toBeVisible();
+  await expect(call).toHaveAttribute("href", "tel:0927617207");
+  await expect(call).toContainText("0927-617-207");
+});
+
 test("every missing contact field names itself instead of silently doing nothing", async ({ page }) => {
   await page.goto("/?testStep=result");
   const submit = page.getByRole("button", { name: "送出並查看完整方向卡" });
@@ -370,7 +389,11 @@ test("copies the demand summary and exposes the real LINE contact", async ({ pag
     });
   });
   await page.goto("/?testStep=result");
-  await expect(page.getByRole("link", { name: "改用 LINE 聯絡" })).toHaveAttribute("href", "https://line.me/R/ti/p/%40tainanwei");
+  // oaMessage 直接開對話框；加好友落地頁在電腦上會顯示 QR Code。
+  const lineHref = await page.getByRole("link", { name: "改用 LINE 聯絡" }).getAttribute("href");
+  expect(lineHref).toContain("https://line.me/R/oaMessage/%40tainanwei/");
+  expect(lineHref).not.toContain("/ti/p/");
+  expect(decodeURIComponent(lineHref)).toContain("買房方向診斷");
   await page.getByRole("button", { name: "複製需求摘要" }).click();
   await expect(page.locator("#toast")).toHaveText("需求摘要已複製");
   await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("台南小魏 買厝作伙");

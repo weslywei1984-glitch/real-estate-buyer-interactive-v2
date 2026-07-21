@@ -542,9 +542,10 @@ function renderComplete({ focus = true } = {}) {
           </label>`).join("")}
         </div>
       </fieldset>
-      <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店｜<a href="tel:${PHONE.replaceAll("-", "")}">${PHONE}</a></p>
+      <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店</p>
       <div class="fallback-actions">
         <button id="copyButton" type="button">複製需求摘要</button>
+        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
         <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找台南小魏</a>
       </div>
     </section>`;

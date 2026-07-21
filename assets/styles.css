@@ -680,6 +680,15 @@ legend,
   min-width: 150px;
 }
 
+.fallback-actions a.call-action {
+  gap: 6px;
+  background: var(--mint);
+}
+
+.fallback-actions a.call-action:hover {
+  background: var(--paper);
+}
+
 .complete-seal {
   display: grid;
   width: 54px;
