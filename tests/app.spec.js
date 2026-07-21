@@ -158,7 +158,27 @@ test("invalid phone cannot submit and exposes field guidance", async ({ page }) 
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
   await expect(page.getByText("請輸入 09 開頭的 10 碼手機號碼")).toBeVisible();
   await expect(page.getByLabel("手機號碼")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("button", { name: "送出並查看完整方向卡" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await expect(page.getByRole("alert")).toContainText("09 開頭的 10 碼手機號碼");
+  await expect(page.getByLabel("手機號碼")).toBeFocused();
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
+});
+
+test("every missing contact field names itself instead of silently doing nothing", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  const submit = page.getByRole("button", { name: "送出並查看完整方向卡" });
+
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("請填寫怎麼稱呼您");
+  await expect(page.getByLabel("怎麼稱呼您？")).toBeFocused();
+
+  await page.getByLabel("怎麼稱呼您？").fill("王小姐");
+  await page.getByLabel("手機號碼").fill("0912345678");
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("我同意由小魏依這份結果與我聯繫");
+  await expect(page.getByLabel("我同意由小魏依這份結果與我聯繫")).toBeFocused();
 });
 
 test("missing backend reports an honest error and keeps answers available", async ({ page }) => {

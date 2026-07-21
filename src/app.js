@@ -210,23 +210,30 @@ function createSubmissionSnapshot() {
   return deepFreeze({ answers, result, payload, summary });
 }
 
+function reportSubmitBlocked(message, fieldId) {
+  state.submitError = message;
+  render({ focus: false });
+  focusElement($(fieldId));
+}
+
 async function handleSubmit() {
   if (state.submitting) return;
   state.phoneTouched = true;
   updateSubmitState();
 
   if (!state.answers.name.trim()) {
-    focusElement($("name"));
+    reportSubmitBlocked("還差一步：請填寫怎麼稱呼您。", "name");
     return;
   }
   if (!isTaiwanMobile(state.answers.phone)) {
-    focusElement($("phone"));
+    reportSubmitBlocked("還差一步：請填寫 09 開頭的 10 碼手機號碼。", "phone");
     return;
   }
   if (!state.answers.consent) {
-    focusElement($("consent"));
+    reportSubmitBlocked("還差一步：請勾選「我同意由小魏依這份結果與我聯繫」。", "consent");
     return;
   }
+  state.submitError = "";
 
   state.submitAttempted = true;
   if (!services.endpoint) {
@@ -445,9 +452,7 @@ function bindContactEvents() {
 }
 
 function updateSubmitState() {
-  const nameValid = Boolean(state.answers.name.trim());
   const phoneValid = isTaiwanMobile(state.answers.phone);
-  const valid = nameValid && phoneValid && state.answers.consent;
   const phone = $("phone");
   const guidance = $("phoneGuidance");
   const showPhoneError = state.phoneTouched && !phoneValid;
@@ -457,7 +462,9 @@ function updateSubmitState() {
     ? "請輸入 09 開頭的 10 碼手機號碼"
     : "可輸入 0912-345-678，送出時會整理為 10 碼數字。";
   guidance.classList.toggle("error", showPhoneError);
-  $("submitButton").disabled = !valid || state.submitting;
+  // 按鈕只在送出中鎖住。缺欄位時仍可按，由 handleSubmit 指出還差什麼，
+  // 避免使用者按了完全沒反應。
+  $("submitButton").disabled = state.submitting;
 }
 
 function renderResult({ focus = true } = {}) {
@@ -473,7 +480,7 @@ function renderResult({ focus = true } = {}) {
       : "送出並查看完整方向卡";
 
   $("resultArea").innerHTML = `${resultPreview(result)}
-    <form id="leadForm" class="result-card contact-card" aria-busy="${state.submitting}">
+    <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
       <p class="eyebrow">最後一步 · 確認聯絡方式</p>
       <h3>把完整方向卡整理給您</h3>
       <p class="contact-intro">送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
