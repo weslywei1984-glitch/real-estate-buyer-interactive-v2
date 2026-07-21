@@ -5,7 +5,8 @@ const HEADERS = [
   "想找區域", "生活重心", "自備款區間", "舒服月付區間", "居住人數", "希望房數",
   "第三房用途", "物件類型", "屋齡接受度", "車位需求", "最重視條件", "一定避開條件",
   "其他避開說明", "買方狀態", "找房方向摘要", "預算提醒", "看屋策略", "同意聯繫",
-  "後續狀態", "承辦備註", "下次跟進日期"
+  "後續狀態", "承辦備註", "下次跟進日期",
+  "入住整理預算", "屋況接受度", "出價心理底線"
 ];
 
 function doPost(e) {
@@ -24,7 +25,8 @@ function doPost(e) {
         safe_(data.thirdRoomUse), list_(data.propertyTypes), safe_(data.agePreference), safe_(data.parking),
         list_(data.mustHaves), list_(data.noGos), safe_(data.otherNoGo), safe_(data.buyerStatus),
         list_(data.direction), safe_(data.budgetReminder), list_(data.strategy), data.consent ? "是" : "否",
-        "新名單", "", ""
+        "新名單", "", "",
+        safe_(data.moveInBudget), safe_(data.conditionTolerance), safe_(data.decisionLimit)
       ]);
     }
     return json_({ ok: true, submissionId: data.submissionId });

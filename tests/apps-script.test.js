@@ -8,7 +8,8 @@ const EXPECTED_HEADERS = [
   "想找區域", "生活重心", "自備款區間", "舒服月付區間", "居住人數", "希望房數",
   "第三房用途", "物件類型", "屋齡接受度", "車位需求", "最重視條件", "一定避開條件",
   "其他避開說明", "買方狀態", "找房方向摘要", "預算提醒", "看屋策略", "同意聯繫",
-  "後續狀態", "承辦備註", "下次跟進日期"
+  "後續狀態", "承辦備註", "下次跟進日期",
+  "入住整理預算", "屋況接受度", "出價心理底線"
 ];
 
 class MockSheet {
@@ -179,6 +180,9 @@ function validPayload(overrides = {}) {
     direction: ["先鎖定東區與北區"],
     budgetReminder: "以每月可負擔金額為準",
     strategy: ["先安排生活圈帶看"],
+    moveInBudget: "10～30萬",
+    conditionTolerance: "小修可以接受",
+    decisionLimit: "已有明確上限，不會超過",
     consent: true,
     ...overrides
   };

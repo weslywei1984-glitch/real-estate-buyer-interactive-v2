@@ -4,15 +4,17 @@ import { deriveResult, VIDEO_QUESTIONS } from "../src/result.js";
 
 const complete = {
   purpose: "自住", timeline: "3個月內", areas: ["永康區"], customArea: "",
-  lifeFocus: "工作通勤", downPayment: "200～300萬", monthlyMortgage: "2～3萬",
+  lifeFocus: ["工作通勤"], downPayment: "200～300萬", monthlyMortgage: "2～3萬",
   householdSize: "2", rooms: "3房", thirdRoomUse: "偶爾來客",
   propertyTypes: ["電梯大樓"], agePreference: "20年內", parking: "一定要平車",
-  mustHaves: ["格局", "採光通風", "安靜"], noGos: ["西曬"], otherNoGo: ""
+  mustHaves: ["格局", "採光通風", "安靜"], noGos: ["西曬"], otherNoGo: "",
+  moveInBudget: "10～30萬", conditionTolerance: "小修可以接受",
+  decisionLimit: "已有明確上限，不會超過"
 };
 
-test("always exposes all seven video-derived questions", () => {
-  assert.equal(VIDEO_QUESTIONS.length, 7);
-  assert.deepEqual(VIDEO_QUESTIONS.map(item => item.ep), [1, 2, 3, 4, 5, 6, 7]);
+test("always exposes all ten video-derived questions", () => {
+  assert.equal(VIDEO_QUESTIONS.length, 10);
+  assert.deepEqual(VIDEO_QUESTIONS.map(item => item.ep), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 });
 
 test("covers the required viewing themes in every episode", () => {
@@ -35,6 +37,11 @@ test("covers the required viewing themes in every episode", () => {
   assert.match(questionByEp[6], /周邊環境/);
   assert.match(questionByEp[7], /第三房/);
   assert.match(questionByEp[7], /準備拿來做什麼/);
+  assert.match(questionByEp[8], /中古屋/);
+  assert.match(questionByEp[8], /屋況/);
+  assert.match(questionByEp[9], /出價前/);
+  assert.match(questionByEp[9], /心理底線/);
+  assert.match(questionByEp[10], /需求範圍|物件資訊/);
 });
 
 test("flags unclear third-room use without judging the buyer", () => {
@@ -50,11 +57,13 @@ test("selects only three to five relevant viewing questions for every result", (
     {
       ...complete,
       timeline: "先看看",
-      downPayment: "還不確定",
-      monthlyMortgage: "希望小魏協助試算",
+      downPayment: "自訂金額",
+      customDownPayment: "還在抓",
+      moveInBudget: "還沒估過",
+      decisionLimit: "希望小魏幫我抓",
       rooms: "2房",
       thirdRoomUse: "",
-      lifeFocus: "無固定地點",
+      lifeFocus: ["無固定地點"],
       mustHaves: ["價格"]
     },
     {
@@ -77,11 +86,13 @@ test("changes relevant episodes deterministically for different buyer needs", ()
   const unclearBudget = deriveResult({
     ...complete,
     timeline: "先看看",
-    downPayment: "還不確定",
-    monthlyMortgage: "希望小魏協助試算",
+    downPayment: "自訂金額",
+    customDownPayment: "還在抓",
+    moveInBudget: "還沒估過",
+    decisionLimit: "希望小魏幫我抓",
     rooms: "2房",
     thirdRoomUse: "",
-    lifeFocus: "無固定地點",
+    lifeFocus: ["無固定地點"],
     mustHaves: ["價格"]
   }).videoQuestions.filter(item => item.relevant).map(item => item.ep);
   const nearTerm = deriveResult({

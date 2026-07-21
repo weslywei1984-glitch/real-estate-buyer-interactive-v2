@@ -62,6 +62,11 @@ async function completeQuestionnaire(page) {
   await page.getByRole("button", { name: "下一題" }).click();
 
   await page.getByRole("button", { name: "格局", exact: true }).click();
+  await page.getByRole("button", { name: "下一題" }).click();
+
+  await page.getByRole("button", { name: "10～30萬", exact: true }).click();
+  await page.getByRole("button", { name: "小修可以接受", exact: true }).click();
+  await page.getByRole("button", { name: "已有明確上限，不會超過", exact: true }).click();
   await page.getByRole("button", { name: "查看方向" }).click();
 }
 
@@ -83,7 +88,7 @@ test("completes the six-screen path and reveals the result/contact page", async 
   await page.getByRole("button", { name: "自住", exact: true }).click();
   await page.getByRole("button", { name: "3個月內", exact: true }).click();
   await page.getByRole("button", { name: "下一題" }).click();
-  await expect(page.getByText("第 2 題，共 6 題")).toBeVisible();
+  await expect(page.getByText("第 2 題，共 7 題")).toBeVisible();
   await expect(page.getByRole("heading", { name: "每天的生活，主要會落在哪裡？" })).toBeFocused();
 
   await completeQuestionnaire(page);
@@ -103,12 +108,12 @@ test("three rooms shows the third-room question and two rooms clears it", async 
   await expect.poll(() => page.evaluate(() => window.__buyerAppTest.state.answers.thirdRoomUse)).toBe("");
 });
 
-test("other no-go expands inline on question six without adding a seventh question", async ({ page }) => {
+test("other no-go expands inline on question six without adding a question screen", async ({ page }) => {
   await page.goto("/?testStep=priorities");
-  await expect(page.getByText("第 6 題，共 6 題")).toBeVisible();
+  await expect(page.getByText("第 6 題，共 7 題")).toBeVisible();
   await page.getByRole("button", { name: "其他", exact: true }).click();
   await expect(page.getByLabel("其他避開條件")).toBeVisible();
-  await expect(page.getByText(/第 7 題/)).toHaveCount(0);
+  await expect(page.getByText("第 6 題，共 7 題")).toBeVisible();
   await page.getByRole("button", { name: "無特殊忌諱", exact: true }).click();
   await expect(page.getByLabel("其他避開條件")).toBeHidden();
 });
@@ -141,7 +146,7 @@ test("back navigation preserves answers that are still valid", async ({ page }) 
   await page.getByRole("button", { name: "3個月內", exact: true }).click();
   await page.getByRole("button", { name: "下一題" }).click();
   await page.getByRole("button", { name: "上一步" }).click();
-  await expect(page.getByText("第 1 題，共 6 題")).toBeVisible();
+  await expect(page.getByText("第 1 題，共 7 題")).toBeVisible();
   await expect(page.getByRole("button", { name: "自住", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "3個月內", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
@@ -213,7 +218,7 @@ test("submission locks mutable controls and confirmed success uses the immutable
   await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("區域：東區");
 });
 
-test("confirmed result has seven keyboard-toggleable viewing checklist items", async ({ page }) => {
+test("confirmed result has ten keyboard-toggleable viewing checklist items", async ({ page }) => {
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
@@ -224,9 +229,9 @@ test("confirmed result has seven keyboard-toggleable viewing checklist items", a
   }));
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
 
-  const checklist = page.getByRole("group", { name: "看屋前，問自己這 7 題" });
+  const checklist = page.getByRole("group", { name: "看屋前，問自己這 10 題" });
   const checkboxes = checklist.getByRole("checkbox");
-  await expect(checkboxes).toHaveCount(7);
+  await expect(checkboxes).toHaveCount(10);
 
   const relevantCount = await checklist.locator('[data-relevant="true"]').count();
   expect(relevantCount).toBeGreaterThanOrEqual(3);
@@ -289,7 +294,7 @@ test("correcting related text fields clears field-level ARIA errors", async ({ p
 
   await page.goto("/?testStep=priorities");
   await page.getByRole("button", { name: "其他", exact: true }).click();
-  await page.getByRole("button", { name: "查看方向" }).click();
+  await page.getByRole("button", { name: "下一題" }).click();
   const noGos = page.locator('[data-field-group="noGos"]');
   const otherNoGo = page.getByLabel("其他避開條件");
   await expect(noGos).toHaveAttribute("aria-invalid", "true");

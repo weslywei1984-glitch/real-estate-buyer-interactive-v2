@@ -5,13 +5,49 @@ import {
   createInitialAnswers,
   getVisibleStepIds,
   clearHiddenAnswers,
+  resolveAnswer,
   validateStep
 } from "../src/questions.js";
 
-test("defines exactly six core question screens", () => {
+test("defines exactly seven core question screens", () => {
   assert.deepEqual(QUESTION_STEPS.map(step => step.id), [
-    "intent", "location", "budget", "space", "property", "priorities"
+    "intent", "location", "budget", "space", "property", "priorities", "decision"
   ]);
+});
+
+test("life focus accepts multiple answers and collapses the no-fixed-place option", () => {
+  const answers = createInitialAnswers();
+  answers.areas = ["永康區"];
+  assert.equal(validateStep("location", answers).valid, false);
+  answers.lifeFocus = ["工作通勤", "日常採買"];
+  assert.equal(validateStep("location", answers).valid, true);
+  answers.lifeFocus = ["工作通勤", "無固定地點"];
+  assert.deepEqual(clearHiddenAnswers(answers).lifeFocus, ["無固定地點"]);
+});
+
+test("custom choices require the typed value and clear when deselected", () => {
+  const answers = createInitialAnswers();
+  answers.downPayment = "自訂金額";
+  answers.monthlyMortgage = "2～3萬";
+  assert.equal(validateStep("budget", answers).errors.customDownPayment, "請輸入自備款金額");
+
+  answers.customDownPayment = "250萬";
+  assert.equal(validateStep("budget", answers).valid, true);
+  assert.equal(resolveAnswer(answers, "downPayment"), "自訂：250萬");
+
+  answers.downPayment = "300～500萬";
+  const cleaned = clearHiddenAnswers(answers);
+  assert.equal(cleaned.customDownPayment, "");
+  assert.equal(resolveAnswer(cleaned, "downPayment"), "300～500萬");
+});
+
+test("the decision step captures move-in cost, condition and price ceiling", () => {
+  const answers = createInitialAnswers();
+  assert.equal(validateStep("decision", answers).valid, false);
+  answers.moveInBudget = "10～30萬";
+  answers.conditionTolerance = "小修可以接受";
+  answers.decisionLimit = "還沒想過";
+  assert.equal(validateStep("decision", answers).valid, true);
 });
 
 test("third-room use is required only for three rooms or more", () => {
@@ -28,7 +64,7 @@ test("third-room use is required only for three rooms or more", () => {
 
 test("location requires at least one area or a custom area", () => {
   const answers = createInitialAnswers();
-  answers.lifeFocus = "工作通勤";
+  answers.lifeFocus = ["工作通勤"];
   assert.equal(validateStep("location", answers).valid, false);
   answers.areas = ["永康區"];
   assert.equal(validateStep("location", answers).valid, true);
@@ -43,12 +79,12 @@ test("priorities limits must-haves to three and accepts no special no-go", () =>
   assert.equal(validateStep("priorities", answers).valid, true);
 });
 
-test("other no-go is an inline priorities field, not a seventh question screen", () => {
+test("other no-go is an inline priorities field, not its own question screen", () => {
   const priorities = QUESTION_STEPS.find(step => step.id === "priorities");
   const otherNoGo = priorities.fields.find(field => field.key === "otherNoGo");
   const answers = createInitialAnswers();
 
-  assert.equal(getVisibleStepIds(answers).length, 6);
+  assert.equal(getVisibleStepIds(answers).length, 7);
   assert.equal(QUESTION_STEPS.some(step => step.id === "otherNoGo"), false);
   assert.equal(otherNoGo.when, "otherNoGo");
 

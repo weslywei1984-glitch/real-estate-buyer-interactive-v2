@@ -1,3 +1,9 @@
+import { resolveAnswer } from "./questions.js";
+
+function listOf(value) {
+  return Array.isArray(value) ? value : [value].filter(Boolean);
+}
+
 export function normalizePhone(value = "") {
   return String(value).replace(/\D/g, "").slice(0, 10);
 }
@@ -16,18 +22,21 @@ export function buildPayload({ answers, result, submissionId, submittedAt = new 
     purpose: answers.purpose || "",
     timeline: answers.timeline || "",
     areas: [...(answers.areas || []), answers.customArea].filter(Boolean),
-    lifeFocus: answers.lifeFocus || "",
-    downPayment: answers.downPayment || "",
-    monthlyMortgage: answers.monthlyMortgage || "",
+    lifeFocus: listOf(answers.lifeFocus),
+    downPayment: resolveAnswer(answers, "downPayment"),
+    monthlyMortgage: resolveAnswer(answers, "monthlyMortgage"),
     householdSize: answers.householdSize || "",
-    rooms: answers.rooms || "",
+    rooms: resolveAnswer(answers, "rooms"),
     thirdRoomUse: answers.thirdRoomUse || "",
     propertyTypes: answers.propertyTypes || [],
-    agePreference: answers.agePreference || "",
+    agePreference: resolveAnswer(answers, "agePreference"),
     parking: answers.parking || "",
     mustHaves: answers.mustHaves || [],
     noGos: answers.noGos || [],
     otherNoGo: answers.otherNoGo || "",
+    moveInBudget: answers.moveInBudget || "",
+    conditionTolerance: answers.conditionTolerance || "",
+    decisionLimit: answers.decisionLimit || "",
     buyerStatus: result.status,
     direction: result.direction,
     budgetReminder: result.budgetReminder,
@@ -42,10 +51,13 @@ export function buildSummary({ answers, result }) {
     `聯絡人：${answers.name || "未填"}`,
     `區域：${[...(answers.areas || []), answers.customArea].filter(Boolean).join("、") || "未填"}`,
     `目的／時程：${answers.purpose || "未填"}／${answers.timeline || "未填"}`,
-    `預算：${answers.downPayment || "未填"}／${answers.monthlyMortgage || "未填"}`,
-    `家庭：${answers.householdSize || "未填"}；房數：${answers.rooms || "未填"}／${answers.thirdRoomUse || "無需填寫"}`,
-    `物件：${(answers.propertyTypes || []).join("、") || "未填"}／${answers.agePreference || "未填"}／${answers.parking || "未填"}`,
+    `生活重心：${listOf(answers.lifeFocus).join("、") || "未填"}`,
+    `預算：${resolveAnswer(answers, "downPayment") || "未填"}／${resolveAnswer(answers, "monthlyMortgage") || "未填"}`,
+    `家庭：${answers.householdSize || "未填"}；房數：${resolveAnswer(answers, "rooms") || "未填"}／${answers.thirdRoomUse || "無需填寫"}`,
+    `物件：${(answers.propertyTypes || []).join("、") || "未填"}／${resolveAnswer(answers, "agePreference") || "未填"}／${answers.parking || "未填"}`,
     `必備：${(answers.mustHaves || []).join("、") || "未填"}`,
+    `入住整理預算：${answers.moveInBudget || "未填"}；屋況接受度：${answers.conditionTolerance || "未填"}`,
+    `出價心理底線：${answers.decisionLimit || "未填"}`,
     `目前狀態：${result.status}`,
     ...result.strategy.map(item => `• ${item}`),
     "台南小魏 買厝作伙｜魏泉承｜0927-617-207"

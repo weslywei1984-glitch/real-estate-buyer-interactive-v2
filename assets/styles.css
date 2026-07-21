@@ -461,6 +461,12 @@ legend,
   margin-top: 22px;
 }
 
+.custom-field {
+  margin-top: 14px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+
 .field input,
 .field textarea {
   width: 100%;

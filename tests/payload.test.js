@@ -14,7 +14,7 @@ const answers = {
   timeline: "三個月內",
   areas: ["東區"],
   customArea: "北區",
-  lifeFocus: "通勤",
+  lifeFocus: ["通勤"],
   downPayment: "200萬以上",
   monthlyMortgage: "2萬以下",
   householdSize: "2人",
@@ -26,6 +26,9 @@ const answers = {
   mustHaves: ["電梯"],
   noGos: ["無管理"],
   otherNoGo: "不要頂樓",
+  moveInBudget: "10～30萬",
+  conditionTolerance: "小修可以接受",
+  decisionLimit: "還沒想過",
   consent: true
 };
 

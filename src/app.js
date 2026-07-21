@@ -2,6 +2,7 @@ import {
   QUESTION_STEPS,
   clearHiddenAnswers,
   createInitialAnswers,
+  customFieldFor,
   needsThirdRoomUse,
   validateStep
 } from "./questions.js";
@@ -50,28 +51,24 @@ function escapeHtml(value = "") {
   );
 }
 
-function validationKeyForField(fieldKey) {
-  if (["areas", "customArea"].includes(fieldKey)) return "areas";
-  if (["noGos", "otherNoGo"].includes(fieldKey)) return "otherNoGo";
-  return fieldKey;
-}
-
 function clearAllStepErrors() {
   state.stepErrors = {};
   state.stepErrorTitle = "請先完成這一題";
 }
 
-function refreshStepErrorState(fieldKey) {
-  const validationKey = validationKeyForField(fieldKey);
-  if (!(validationKey in state.stepErrors)) return;
+function refreshStepErrorState() {
+  const shownKeys = Object.keys(state.stepErrors);
+  if (!shownKeys.length) return;
   const step = QUESTION_STEPS[state.stepIndex];
   if (!step) {
-    delete state.stepErrors[validationKey];
+    state.stepErrors = {};
     return;
   }
-  const nextError = validateStep(step.id, state.answers).errors[validationKey];
-  if (nextError) state.stepErrors[validationKey] = nextError;
-  else delete state.stepErrors[validationKey];
+  const nextErrors = validateStep(step.id, state.answers).errors;
+  for (const key of shownKeys) {
+    if (nextErrors[key]) state.stepErrors[key] = nextErrors[key];
+    else delete state.stepErrors[key];
+  }
 }
 
 function syncStepErrorUi() {
@@ -139,8 +136,14 @@ function setAnswer(key, value, focusValue = value) {
   if (state.submitting) return;
   state.answers[key] = value;
   state.answers = clearHiddenAnswers(state.answers);
-  refreshStepErrorState(key);
+  refreshStepErrorState();
   render({ focus: false });
+
+  const custom = customFieldFor(key);
+  if (custom && state.answers[key] === custom.option) {
+    focusElement($(`field-${custom.key}`));
+    return;
+  }
   focusChoice(key, focusValue);
 }
 
@@ -288,7 +291,15 @@ function renderField(field) {
   }
 
   const values = field.type === "multi" ? state.answers[field.key] : [state.answers[field.key]];
-  const hint = field.max ? `<span class="field-guidance">可選 1～${field.max} 個</span>` : "";
+  const hint = field.max
+    ? `<span class="field-guidance">可選 1～${field.max} 個</span>`
+    : field.type === "multi" ? `<span class="field-guidance">可複選</span>` : "";
+  const custom = field.custom && state.answers[field.key] === field.custom.option
+    ? `<label class="field custom-field" for="field-${field.custom.key}">
+        <span>${escapeHtml(field.custom.label)}</span>
+        <input id="field-${field.custom.key}" data-text-field="${field.custom.key}" value="${escapeHtml(state.answers[field.custom.key])}" placeholder="${escapeHtml(field.custom.placeholder)}" autocomplete="off"${disabled}>
+      </label>`
+    : "";
   return `<fieldset data-field-group="${field.key}">
     <legend>${escapeHtml(field.label)}</legend>${hint}
     <div class="choice-grid">
@@ -297,6 +308,7 @@ function renderField(field) {
         return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}"${disabled}>${escapeHtml(option)}</button>`;
       }).join("")}
     </div>
+    ${custom}
   </fieldset>`;
 }
 
@@ -335,7 +347,7 @@ function bindQuestionEvents() {
       const fieldKey = event.currentTarget.dataset.textField;
       state.answers[fieldKey] = event.currentTarget.value;
       state.answers = clearHiddenAnswers(state.answers);
-      refreshStepErrorState(fieldKey);
+      refreshStepErrorState();
       syncStepErrorUi();
     });
   });
@@ -349,7 +361,7 @@ function renderIntro({ focus = true } = {}) {
     <div>
       <p class="eyebrow">台南小魏 · 買厝作伙</p>
       <h1 tabindex="-1">找到適合生活的房子，從問對問題開始。</h1>
-      <p class="hero-copy">用 6 個關鍵選擇，先整理預算、空間與每天的生活動線。不是替您打分數，而是把值得看的方向變清楚。</p>
+      <p class="hero-copy">用 ${QUESTION_STEPS.length} 個關鍵選擇，先整理預算、空間、屋況與出價底線。不是替您打分數，而是把值得看的方向變清楚。</p>
       <div class="intro-meta"><span>約 1 分鐘完成</span><span>可隨時返回修改</span></div>
       <button class="primary" id="startButton" type="button">開始整理</button>
     </div>
@@ -505,7 +517,7 @@ function renderComplete({ focus = true } = {}) {
       <h3>最適合您的看屋策略</h3>
       <ul class="strategy-list">${result.strategy.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
       <fieldset class="video-list">
-        <legend>看屋前，問自己這 7 題</legend>
+        <legend>看屋前，問自己這 ${result.videoQuestions.length} 題</legend>
         <div class="video-list-items">${result.videoQuestions.map(item => `
           <label class="video-check-item ${item.relevant ? "relevant" : ""}" data-relevant="${item.relevant}">
             <input type="checkbox">
@@ -533,7 +545,7 @@ function applyLocalTestShortcut() {
     purpose: "自住",
     timeline: "3個月內",
     areas: ["永康區"],
-    lifeFocus: "工作通勤",
+    lifeFocus: ["工作通勤"],
     downPayment: "200～300萬",
     monthlyMortgage: "2～3萬",
     householdSize: "2 人",
@@ -542,7 +554,10 @@ function applyLocalTestShortcut() {
     agePreference: "20年內",
     parking: "一定要平車",
     mustHaves: ["格局"],
-    noGos: []
+    noGos: [],
+    moveInBudget: "10～30萬",
+    conditionTolerance: "小修可以接受",
+    decisionLimit: "已有明確上限，不會超過"
   });
 
   if (target === "result") {
