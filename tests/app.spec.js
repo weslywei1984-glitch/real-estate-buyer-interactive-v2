@@ -188,6 +188,51 @@ test("submits even without crypto.randomUUID, as on a plain http origin", async 
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
 });
 
+test("the confirmed page plays a completion animation and settles fully readable", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+
+  const played = await page.evaluate(() => document.getAnimations().map(animation => animation.animationName));
+  expect(played).toContain("seal-pop");
+  expect(played.filter(name => name === "card-in").length).toBeGreaterThanOrEqual(6);
+
+  // 動畫收尾後每一塊都必須完全不透明，否則成功頁會停成一張白卡。
+  await page.evaluate(async () => {
+    document.getAnimations().forEach(animation => animation.finish());
+    await document.fonts?.ready;
+  });
+  const opacities = await page.evaluate(() =>
+    [...document.querySelectorAll(".complete-card > *")].map(el => getComputedStyle(el).opacity));
+  expect(opacities.length).toBeGreaterThanOrEqual(8);
+  expect(opacities.every(value => value === "1")).toBe(true);
+});
+
+test("the completion card stays readable when the animation never starts", async ({ page }) => {
+  // .animate-in 是 JS 加的。JS 沒跑到這一步時，內容仍然要看得見。
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+
+  const opacities = await page.evaluate(() => {
+    document.querySelector(".complete-card").classList.remove("animate-in");
+    return [...document.querySelectorAll(".complete-card > *")].map(el => getComputedStyle(el).opacity);
+  });
+  expect(opacities.every(value => value === "1")).toBe(true);
+});
+
 test("the confirmed page offers a one-tap call and the result page does not", async ({ page }) => {
   await page.goto("/?testStep=result");
   await expect(page.getByRole("link", { name: /直接撥打/ })).toHaveCount(0);

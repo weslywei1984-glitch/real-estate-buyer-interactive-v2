@@ -514,6 +514,24 @@ function renderResult({ focus = true } = {}) {
   if (focus) focusElement($("resultArea").querySelector("h2"));
 }
 
+// 分頁在背景時動畫時間軸是凍結的，直接掛上去買方回來只會看到播到一半的畫面。
+// 等真的看得到再開始播，讓他從頭看到完整的完成動畫。
+function playCompleteAnimation() {
+  const card = document.querySelector(".complete-card");
+  if (!card) return;
+
+  const start = () => document.querySelector(".complete-card")?.classList.add("animate-in");
+  if (document.visibilityState === "visible") {
+    start();
+    return;
+  }
+  document.addEventListener("visibilitychange", function onVisible() {
+    if (document.visibilityState !== "visible") return;
+    document.removeEventListener("visibilitychange", onVisible);
+    start();
+  });
+}
+
 function renderComplete({ focus = true } = {}) {
   $("hero").hidden = true;
   $("wizard").hidden = true;
@@ -526,7 +544,7 @@ function renderComplete({ focus = true } = {}) {
   }
   const result = snapshot.result;
   $("resultArea").innerHTML = `${resultPreview(result)}
-    <section class="result-card">
+    <section class="result-card complete-card">
       <div class="complete-seal" aria-hidden="true">✓</div>
       <h3 tabindex="-1">完整方向卡已確認送出</h3>
       <p>資料已確認入表，小魏會依這份方向與您聯繫。以下清單也可以先保存，之後看屋時逐項確認。</p>
@@ -550,6 +568,7 @@ function renderComplete({ focus = true } = {}) {
       </div>
     </section>`;
   $("copyButton").addEventListener("click", copySummary);
+  playCompleteAnimation();
   if (focus) focusElement($("resultArea").querySelector("h3[tabindex]"));
 }
 

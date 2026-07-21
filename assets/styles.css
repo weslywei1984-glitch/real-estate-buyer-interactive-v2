@@ -690,6 +690,7 @@ legend,
 }
 
 .complete-seal {
+  position: relative;
   display: grid;
   width: 54px;
   height: 54px;
@@ -699,6 +700,61 @@ legend,
   border-radius: 50%;
   background: var(--ink);
   font-size: 24px;
+}
+
+/*
+ * 動畫全部掛在 .animate-in 上，由 app.js 在分頁真的看得到時才加。
+ * 預設狀態就是「完全可見」——萬一 JS 沒跑或動畫沒動，成功頁照樣讀得到，
+ * 不會停在 opacity 0 變成一張白卡。
+ */
+.complete-card.animate-in .complete-seal {
+  animation: seal-pop 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+/* 送出成功後往外擴散一次的光圈，只跑一輪，不干擾閱讀。 */
+.complete-card.animate-in .complete-seal::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  animation: seal-ring 0.9s ease-out 0.18s both;
+}
+
+.complete-card.animate-in > *:not(.complete-seal) {
+  animation: card-in 0.5s ease both;
+}
+
+.complete-card.animate-in > *:nth-child(2) { animation-delay: 0.16s; }
+.complete-card.animate-in > *:nth-child(3) { animation-delay: 0.24s; }
+.complete-card.animate-in > *:nth-child(4) { animation-delay: 0.32s; }
+.complete-card.animate-in > *:nth-child(5) { animation-delay: 0.4s; }
+.complete-card.animate-in > *:nth-child(6) { animation-delay: 0.48s; }
+.complete-card.animate-in > *:nth-child(7) { animation-delay: 0.56s; }
+.complete-card.animate-in > *:nth-child(8) { animation-delay: 0.64s; }
+
+@keyframes seal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes seal-ring {
+  from {
+    opacity: 0.5;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.55);
+  }
 }
 
 .contact-signature {
