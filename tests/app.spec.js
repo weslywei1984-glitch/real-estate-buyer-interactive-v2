@@ -474,6 +474,65 @@ test("submission error unlocks controls and preserves contact answers for retry"
   await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
 });
 
+test("retry after an uncertain failure reuses the same submission id", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  const firstSubmissionId = await page.evaluate(() => window.__capturedPayload.submissionId);
+  await page.evaluate(() => {
+    const error = new Error("confirmation timeout");
+    error.code = "SUBMISSION_NOT_CONFIRMED";
+    window.__submissionControl.reject(error);
+  });
+  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
+
+  await page.evaluate(() => {
+    window.__buyerAppTest.configureServices({
+      endpoint: "https://example.test/retry-submit",
+      submitLead: ({ payload }) => {
+        window.__retryPayload = structuredClone(payload);
+        return Promise.resolve({ ok: true, submissionId: payload.submissionId });
+      }
+    });
+  });
+  await page.getByRole("button", { name: "重新送出並確認" }).click();
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__retryPayload.submissionId)).toBe(firstSubmissionId);
+});
+
+test("editing contact details after a failed attempt creates a fresh snapshot", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  const firstSubmissionId = await page.evaluate(() => window.__capturedPayload.submissionId);
+  await page.evaluate(() => {
+    const error = new Error("confirmation timeout");
+    error.code = "SUBMISSION_NOT_CONFIRMED";
+    window.__submissionControl.reject(error);
+  });
+  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
+  await page.getByLabel("手機號碼").fill("0987654321");
+
+  await page.evaluate(() => {
+    window.__buyerAppTest.configureServices({
+      endpoint: "https://example.test/retry-submit",
+      submitLead: ({ payload }) => {
+        window.__retryPayload = structuredClone(payload);
+        return Promise.resolve({ ok: true, submissionId: payload.submissionId });
+      }
+    });
+  });
+  await page.getByRole("button", { name: "重新送出並確認" }).click();
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+  const retryPayload = await page.evaluate(() => window.__retryPayload);
+  expect(retryPayload.submissionId).not.toBe(firstSubmissionId);
+  expect(retryPayload.phone).toBe("0987654321");
+});
+
 test("correcting related text fields clears field-level ARIA errors", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "開始整理" }).click();
@@ -567,6 +626,25 @@ test("mobile priority page starts with only the core choices", async ({ page }) 
     element => getComputedStyle(element).gridTemplateColumns
   );
   expect(columns.split(" ").length).toBe(2);
+});
+
+test("mobile optional no-go choices keep long labels in one readable column", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/?testStep=priorities");
+  await page.getByRole("button", { name: /有一定避開的條件嗎/ }).click();
+
+  const noGoGrid = page.locator('[data-field-group="noGos"] .choice-grid');
+  const columns = await noGoGrid.evaluate(element => getComputedStyle(element).gridTemplateColumns);
+  expect(columns.split(" ").length).toBe(1);
+
+  for (const label of ["特殊風水／路沖", "基地台或高壓電"]) {
+    const metrics = await page.getByRole("button", { name: label, exact: true }).evaluate(element => ({
+      height: element.getBoundingClientRect().height,
+      fullyReadable: element.scrollWidth <= element.clientWidth + 1
+    }));
+    expect(metrics.height).toBeGreaterThanOrEqual(52);
+    expect(metrics.fullyReadable).toBe(true);
+  }
 });
 
 test("reduced motion keeps the question readable without visible transitions", async ({ page }) => {

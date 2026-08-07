@@ -222,6 +222,11 @@ function createSubmissionSnapshot() {
   return deepFreeze({ answers, result, payload, summary });
 }
 
+function activeSubmissionMatchesCurrentAnswers() {
+  if (!state.activeSubmission) return false;
+  return JSON.stringify(state.activeSubmission.answers) === JSON.stringify(clearHiddenAnswers(state.answers));
+}
+
 function reportSubmitBlocked(message, fieldId) {
   state.submitError = message;
   render({ focus: false });
@@ -260,7 +265,9 @@ async function handleSubmit() {
 
   let snapshot;
   try {
-    snapshot = createSubmissionSnapshot();
+    snapshot = activeSubmissionMatchesCurrentAnswers()
+      ? state.activeSubmission
+      : createSubmissionSnapshot();
   } catch {
     // 寧可講出來，也不要讓按鈕按下去毫無反應。
     reportSubmitBlocked("目前無法整理這份方向卡，請重新整理頁面再送出一次，或改用 LINE 聯絡小魏。", "submitError");
@@ -281,7 +288,6 @@ async function handleSubmit() {
       : "目前無法送出，答案已保留。請重新送出、複製摘要或改用 LINE。";
   } finally {
     state.submitting = false;
-    if (state.phase !== "complete") state.activeSubmission = null;
     render({ focus: state.phase === "complete" });
     if (state.phase !== "complete") focusElement($("submitError"));
   }
@@ -318,7 +324,7 @@ function renderField(field) {
   }
 
   const values = field.type === "multi" ? state.answers[field.key] : [state.answers[field.key]];
-  const compact = field.options.every(option => [...option].length <= 7) ? " compact" : "";
+  const compact = field.options.every(option => [...option].length <= 6) ? " compact" : "";
   const hint = field.max
     ? `<span class="field-guidance selected-summary" role="status">還能選 ${Math.max(0, field.max - values.length)} 個</span>`
     : field.type === "multi" ? `<span class="field-guidance">可複選</span>` : "";
