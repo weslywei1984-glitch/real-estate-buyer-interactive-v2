@@ -85,12 +85,10 @@ function relevantVideoEpisodes(answers) {
   if ((answers.areas?.length || 0) >= 4) add(10, 2);
   if (!mustHaves.length) add(10, 2);
 
-  return new Set(
-    [...scores.entries()]
-      .sort(([firstEp, firstScore], [secondEp, secondScore]) => secondScore - firstScore || firstEp - secondEp)
-      .slice(0, 4)
-      .map(([ep]) => ep)
-  );
+  return [...scores.entries()]
+    .sort(([firstEp, firstScore], [secondEp, secondScore]) => secondScore - firstScore || firstEp - secondEp)
+    .slice(0, 4)
+    .map(([ep]) => ep);
 }
 
 export function deriveResult(answers) {
@@ -122,8 +120,13 @@ export function deriveResult(answers) {
   if ((answers.rooms === "3房" || answers.rooms === "3房以上") && ["偶爾來客", "還沒想好"].includes(answers.thirdRoomUse)) {
     strategy.unshift(`目前規劃${rooms}，但第三房用途仍有彈性，可同步比較兩房加彈性空間，避免為不常使用的房間增加負擔。`);
   }
-  const relevant = relevantVideoEpisodes(answers);
-  const videoQuestions = VIDEO_QUESTIONS.map(item => ({ ...item, relevant: relevant.has(item.ep) }));
+  const relevantEpisodes = relevantVideoEpisodes(answers);
+  const relevant = new Set(relevantEpisodes);
+  const questionByEpisode = new Map(VIDEO_QUESTIONS.map(item => [item.ep, item]));
+  const videoQuestions = [
+    ...relevantEpisodes.map(ep => ({ ...questionByEpisode.get(ep), relevant: true })),
+    ...VIDEO_QUESTIONS.filter(item => !relevant.has(item.ep)).map(item => ({ ...item, relevant: false }))
+  ];
   const priorityPreview = videoQuestions.filter(item => item.relevant).slice(0, 3);
   const budgetDetail = answers.moveInBudget
     ? `入住整理預算「${answers.moveInBudget}」也一起估入。`

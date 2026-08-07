@@ -203,8 +203,7 @@ summary:focus-visible {
   outline: none;
 }
 
-.hero-copy,
-.question-hint {
+.hero-copy {
   color: var(--ink-2);
   font-size: clamp(16px, 2vw, 19px);
   line-height: 1.8;
@@ -373,11 +372,6 @@ button:disabled {
 
 .question-card h2 {
   max-width: 760px;
-}
-
-.question-hint {
-  max-width: 700px;
-  margin: 0;
 }
 
 .advisor-tip {

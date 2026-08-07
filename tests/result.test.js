@@ -55,7 +55,7 @@ test("flags unclear third-room use without judging the buyer", () => {
   assert.ok(result.videoQuestions.some(item => item.ep === 7 && item.relevant));
 });
 
-test("selects only three to five relevant viewing questions for every result", () => {
+test("selects exactly four relevant viewing questions for every result", () => {
   const branches = [
     complete,
     {
@@ -81,14 +81,22 @@ test("selects only three to five relevant viewing questions for every result", (
 
   for (const answers of branches) {
     const relevantCount = deriveResult(answers).videoQuestions.filter(item => item.relevant).length;
-    assert.ok(relevantCount >= 3 && relevantCount <= 5, `relevant count was ${relevantCount}`);
+    assert.equal(relevantCount, 4);
   }
+});
+
+test("orders the four relevant questions by descending personalization score", () => {
+  const result = deriveResult(completeAnswers());
+  const relevantEpisodes = result.videoQuestions.filter(item => item.relevant).map(item => item.ep);
+
+  assert.deepEqual(relevantEpisodes, [6, 7, 3, 4]);
 });
 
 test("provides exactly three pre-contact priority questions", () => {
   const result = deriveResult(completeAnswers());
   assert.equal(result.priorityPreview.length, 3);
   assert.ok(result.priorityPreview.every(item => item.relevant));
+  assert.deepEqual(result.priorityPreview.map(item => item.ep), [6, 7, 3]);
 });
 
 test("does not claim the removed decision questions were answered", () => {

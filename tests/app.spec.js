@@ -76,6 +76,13 @@ test("buyer test hook exists only on exact local hostnames", async ({ page }) =>
   await expect.poll(() => page.evaluate(() => typeof window.__buyerAppTest)).toBe("undefined");
 });
 
+test("static progress semantics match the six-screen questionnaire before JavaScript", async ({ page }) => {
+  await page.route("**/src/app.js", route => route.abort());
+  await page.goto("/");
+
+  await expect(page.locator('[role="progressbar"]')).toHaveAttribute("aria-valuemax", "6");
+});
+
 test("completes the six-screen path and reveals the result/contact page", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "找到適合生活的房子，從問對問題開始。" })).toBeVisible();
@@ -109,13 +116,40 @@ test("shows four priority checks before the remaining six", async ({ page }) => 
     ok: true,
     submissionId: window.__capturedPayload.submissionId
   }));
-  await expect(page.locator("[data-priority-check] input[type=checkbox]")).toHaveCount(4);
+  const priorityChecks = page.locator("[data-priority-check]");
+  await expect(priorityChecks.locator("input[type=checkbox]")).toHaveCount(4);
+  await expect(priorityChecks.locator(".video-question-text")).toHaveText([
+    "室外環境、通勤與生活圈實際走過了嗎？",
+    "第一眼心動後，價格與必要條件也確認了嗎？",
+    "拿掉裝潢加分後，格局仍符合每天的使用方式嗎？",
+    "白天與晚上都看過周邊環境嗎？"
+  ]);
   const more = page.getByText("查看其餘 6 項（完整 10 項）");
   await expect(more).toBeVisible();
   await expect(page.locator("[data-secondary-check] input[type=checkbox]")).toHaveCount(6);
   await expect(page.locator("[data-secondary-check]").first()).not.toBeVisible();
   await more.click();
   await expect(page.locator("[data-secondary-check]").first()).toBeVisible();
+});
+
+test("keyboard opens the full checklist disclosure and keeps focus", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+
+  const details = page.locator(".secondary-video-details");
+  const summary = details.locator("summary");
+  await expect(summary).toHaveCount(1);
+  await expect(details).not.toHaveAttribute("open", "");
+  await summary.focus();
+  await page.keyboard.press("Enter");
+  await expect(details).toHaveAttribute("open", "");
+  await expect(summary).toBeFocused();
 });
 
 test("three rooms shows the third-room question and two rooms clears it", async ({ page }) => {
@@ -437,9 +471,7 @@ test("confirmed result has ten keyboard-toggleable viewing checklist items", asy
   await checklist.getByText("查看其餘 6 項（完整 10 項）").click();
   await expect(checkboxes).toHaveCount(10);
 
-  const relevantCount = await checklist.locator('[data-relevant="true"]').count();
-  expect(relevantCount).toBeGreaterThanOrEqual(3);
-  expect(relevantCount).toBeLessThanOrEqual(5);
+  await expect(checklist.locator('[data-relevant="true"]')).toHaveCount(4);
 
   const payloadBeforeToggle = await page.evaluate(() => structuredClone(window.__capturedPayload));
   const firstQuestion = checkboxes.nth(0);
