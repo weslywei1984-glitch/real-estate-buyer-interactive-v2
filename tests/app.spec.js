@@ -533,6 +533,54 @@ test("editing contact details after a failed attempt creates a fresh snapshot", 
   expect(retryPayload.phone).toBe("0987654321");
 });
 
+test("result preview uses revised questionnaire answers after a failed submission", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => {
+    const error = new Error("confirmation timeout");
+    error.code = "SUBMISSION_NOT_CONFIRMED";
+    window.__submissionControl.reject(error);
+  });
+  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "回上一步" }).click();
+  await page.getByRole("button", { name: "格局", exact: true }).click();
+  await page.getByRole("button", { name: "價格", exact: true }).click();
+  await page.getByRole("button", { name: "查看方向" }).click();
+
+  const preview = page.locator(".preview-priorities");
+  await expect(preview).toContainText("室外環境、通勤與生活圈實際走過了嗎？");
+  await expect(preview).not.toContainText("拿掉裝潢加分後，格局仍符合每天的使用方式嗎？");
+});
+
+test("copied summary uses revised contact details after a failed submission", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async text => { window.__copiedSummary = text; } }
+    });
+  });
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => {
+    const error = new Error("confirmation timeout");
+    error.code = "SUBMISSION_NOT_CONFIRMED";
+    window.__submissionControl.reject(error);
+  });
+  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
+
+  await page.getByLabel("怎麼稱呼您？").fill("陳先生");
+  await page.getByRole("button", { name: "複製需求摘要" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("聯絡人：陳先生");
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("聯絡人：王小姐");
+});
+
 test("correcting related text fields clears field-level ARIA errors", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "開始整理" }).click();

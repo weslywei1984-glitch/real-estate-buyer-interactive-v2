@@ -222,9 +222,13 @@ function createSubmissionSnapshot() {
   return deepFreeze({ answers, result, payload, summary });
 }
 
-function activeSubmissionMatchesCurrentAnswers() {
+function activeSubmissionMatchesCurrentData() {
   if (!state.activeSubmission) return false;
   return JSON.stringify(state.activeSubmission.answers) === JSON.stringify(clearHiddenAnswers(state.answers));
+}
+
+function currentActiveSubmission() {
+  return activeSubmissionMatchesCurrentData() ? state.activeSubmission : null;
 }
 
 function reportSubmitBlocked(message, fieldId) {
@@ -265,9 +269,7 @@ async function handleSubmit() {
 
   let snapshot;
   try {
-    snapshot = activeSubmissionMatchesCurrentAnswers()
-      ? state.activeSubmission
-      : createSubmissionSnapshot();
+    snapshot = currentActiveSubmission() || createSubmissionSnapshot();
   } catch {
     // 寧可講出來，也不要讓按鈕按下去毫無反應。
     reportSubmitBlocked("目前無法整理這份方向卡，請重新整理頁面再送出一次，或改用 LINE 聯絡小魏。", "submitError");
@@ -294,7 +296,7 @@ async function handleSubmit() {
 }
 
 async function copySummary() {
-  const snapshot = state.phase === "complete" ? state.confirmedSubmission : state.activeSubmission;
+  const snapshot = state.phase === "complete" ? state.confirmedSubmission : currentActiveSubmission();
   const text = snapshot?.summary
     || buildSummary({ answers: state.answers, result: deriveResult(state.answers) });
   try {
@@ -523,7 +525,7 @@ function renderResult({ focus = true } = {}) {
   $("hero").hidden = true;
   $("wizard").hidden = true;
   $("resultArea").hidden = false;
-  const result = state.activeSubmission?.result || deriveResult(state.answers);
+  const result = currentActiveSubmission()?.result || deriveResult(state.answers);
   const locked = state.submitting ? " disabled" : "";
   const buttonLabel = state.submitting
     ? "確認資料入表中…"
