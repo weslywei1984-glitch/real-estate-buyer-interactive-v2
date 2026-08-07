@@ -62,11 +62,6 @@ async function completeQuestionnaire(page) {
   await page.getByRole("button", { name: "下一題" }).click();
 
   await page.getByRole("button", { name: "格局", exact: true }).click();
-  await page.getByRole("button", { name: "下一題" }).click();
-
-  await page.getByRole("button", { name: "10～30萬", exact: true }).click();
-  await page.getByRole("button", { name: "小修可以接受", exact: true }).click();
-  await page.getByRole("button", { name: "已有明確上限，不會超過", exact: true }).click();
   await page.getByRole("button", { name: "查看方向" }).click();
 }
 
@@ -88,11 +83,11 @@ test("completes the six-screen path and reveals the result/contact page", async 
   await page.getByRole("button", { name: "自住", exact: true }).click();
   await page.getByRole("button", { name: "3個月內", exact: true }).click();
   await page.getByRole("button", { name: "下一題" }).click();
-  await expect(page.getByText("第 2 題，共 7 題")).toBeVisible();
+  await expect(page.getByText("第 2 題，共 6 題")).toBeVisible();
   await expect(page.getByRole("heading", { name: "每天的生活，主要會落在哪裡？" })).toBeFocused();
 
   await completeQuestionnaire(page);
-  await expect(page.getByRole("heading", { name: /可以開始精準比較/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /條件整理中/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "把完整方向卡整理給您" })).toBeVisible();
   await expect(page.getByRole("button", { name: "送出並查看完整方向卡" })).toBeVisible();
 });
@@ -110,12 +105,49 @@ test("three rooms shows the third-room question and two rooms clears it", async 
 
 test("other no-go expands inline on question six without adding a question screen", async ({ page }) => {
   await page.goto("/?testStep=priorities");
-  await expect(page.getByText("第 6 題，共 7 題")).toBeVisible();
+  await expect(page.getByText("第 6 題，共 6 題")).toBeVisible();
+  await page.getByRole("button", { name: /有一定避開的條件嗎/ }).click();
   await page.getByRole("button", { name: "其他", exact: true }).click();
   await expect(page.getByLabel("其他避開條件")).toBeVisible();
-  await expect(page.getByText("第 6 題，共 7 題")).toBeVisible();
+  await expect(page.getByText("第 6 題，共 6 題")).toBeVisible();
   await page.getByRole("button", { name: "無特殊忌諱", exact: true }).click();
   await expect(page.getByLabel("其他避開條件")).toBeHidden();
+});
+
+test("uses six progress steps and shows one advisor note per question", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始整理" }).click();
+  await expect(page.getByText("第 1 題，共 6 題")).toBeVisible();
+  await expect(page.locator(".advisor-tip")).toHaveCount(1);
+  await expect(page.locator(".question-hint")).toHaveCount(0);
+  await expect(page.getByText("目的定下來後，後面會更快。" )).toBeVisible();
+});
+
+test("keeps no-go choices collapsed until the buyer opens the optional section", async ({ page }) => {
+  await page.goto("/?testStep=priorities");
+  const toggle = page.getByRole("button", { name: /有一定避開的條件嗎/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "西曬", exact: true })).toHaveCount(0);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "西曬", exact: true })).toBeVisible();
+});
+
+test("can clear no special no-go by pressing it again", async ({ page }) => {
+  await page.goto("/?testStep=priorities");
+  await page.getByRole("button", { name: /有一定避開的條件嗎/ }).click();
+  const none = page.getByRole("button", { name: "無特殊忌諱", exact: true });
+  await none.click();
+  await expect(none).toHaveAttribute("aria-pressed", "true");
+  await none.click();
+  await expect(none).toHaveAttribute("aria-pressed", "false");
+});
+
+test("shows how many priority choices remain", async ({ page }) => {
+  await page.goto("/?testStep=priorities");
+  await expect(page.getByText("還能選 2 個")).toBeVisible();
+  await page.getByRole("button", { name: "地點", exact: true }).click();
+  await expect(page.getByText("還能選 1 個")).toBeVisible();
 });
 
 test("validation error is announced and receives focus", async ({ page }) => {
@@ -146,7 +178,7 @@ test("back navigation preserves answers that are still valid", async ({ page }) 
   await page.getByRole("button", { name: "3個月內", exact: true }).click();
   await page.getByRole("button", { name: "下一題" }).click();
   await page.getByRole("button", { name: "上一步" }).click();
-  await expect(page.getByText("第 1 題，共 7 題")).toBeVisible();
+  await expect(page.getByText("第 1 題，共 6 題")).toBeVisible();
   await expect(page.getByRole("button", { name: "自住", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "3個月內", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
@@ -400,8 +432,9 @@ test("correcting related text fields clears field-level ARIA errors", async ({ p
   await expect(page.locator('[data-field-group="lifeFocus"]')).toHaveAttribute("aria-invalid", "true");
 
   await page.goto("/?testStep=priorities");
+  await page.getByRole("button", { name: /有一定避開的條件嗎/ }).click();
   await page.getByRole("button", { name: "其他", exact: true }).click();
-  await page.getByRole("button", { name: "下一題" }).click();
+  await page.getByRole("button", { name: "查看方向" }).click();
   const noGos = page.locator('[data-field-group="noGos"]');
   const otherNoGo = page.getByLabel("其他避開條件");
   await expect(noGos).toHaveAttribute("aria-invalid", "true");

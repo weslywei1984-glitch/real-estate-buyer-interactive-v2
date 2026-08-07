@@ -12,6 +12,15 @@ import { submitLead } from "./api.js";
 import { randomId } from "./random.js";
 import { BACKEND_URL, LINE_URL, PHONE } from "./config.js";
 
+const STEP_MILESTONES = [
+  "目的定下來後，後面會更快。",
+  "生活圈有方向了。",
+  "負擔範圍更清楚了。",
+  "空間需求整理好了。",
+  "物件範圍縮小了。",
+  "可以看方向卡了。"
+];
+
 const state = {
   answers: createInitialAnswers(),
   stepIndex: -1,
@@ -20,6 +29,7 @@ const state = {
   submitError: "",
   submitAttempted: false,
   phoneTouched: false,
+  noGosExpanded: false,
   stepErrors: {},
   stepErrorTitle: "請先完成這一題",
   activeSubmission: null,
@@ -160,6 +170,7 @@ function goNext() {
   if (state.stepIndex < 0) {
     state.phase = "questions";
     state.stepIndex = 0;
+    state.noGosExpanded = false;
     clearAllStepErrors();
     render();
     return;
@@ -308,7 +319,7 @@ function renderField(field) {
 
   const values = field.type === "multi" ? state.answers[field.key] : [state.answers[field.key]];
   const hint = field.max
-    ? `<span class="field-guidance">可選 1～${field.max} 個</span>`
+    ? `<span class="field-guidance selected-summary" role="status">還能選 ${Math.max(0, field.max - values.length)} 個</span>`
     : field.type === "multi" ? `<span class="field-guidance">可複選</span>` : "";
   const custom = field.custom && state.answers[field.key] === field.custom.option
     ? `<label class="field custom-field" for="field-${field.custom.key}">
@@ -341,7 +352,7 @@ function bindQuestionEvents() {
 
       let values = [...state.answers[field]];
       if (exclusive && value === exclusive) {
-        values = [exclusive];
+        values = values.includes(exclusive) ? [] : [exclusive];
       } else {
         values = values.filter(item => item !== exclusive);
         values = values.includes(value)
@@ -366,6 +377,14 @@ function bindQuestionEvents() {
       refreshStepErrorState();
       syncStepErrorUi();
     });
+  });
+
+  const optionalToggle = $("optionalNoGosToggle");
+  optionalToggle?.addEventListener("click", () => {
+    if (state.submitting) return;
+    state.noGosExpanded = !state.noGosExpanded;
+    render({ focus: false });
+    focusElement($("optionalNoGosToggle"));
   });
 }
 
@@ -398,16 +417,31 @@ function renderQuestion({ focus = true } = {}) {
   const step = QUESTION_STEPS[state.stepIndex];
   const currentStep = state.stepIndex + 1;
   $("progressText").textContent = `第 ${currentStep} 題，共 ${QUESTION_STEPS.length} 題`;
+  const progressRow = $("progressText").parentElement;
+  let milestone = progressRow.querySelector(".progress-milestone");
+  if (!milestone) {
+    milestone = document.createElement("p");
+    milestone.className = "progress-milestone";
+    progressRow.append(milestone);
+  }
+  milestone.textContent = STEP_MILESTONES[state.stepIndex];
   $("progressBar").style.width = `${(currentStep / QUESTION_STEPS.length) * 100}%`;
   const progress = document.querySelector("[role='progressbar']");
+  progress.setAttribute("aria-valuemax", String(QUESTION_STEPS.length));
   progress.setAttribute("aria-valuenow", String(currentStep));
   progress.setAttribute("aria-valuetext", `第 ${currentStep} 題，共 ${QUESTION_STEPS.length} 題`);
+  const questionFields = step.id === "priorities"
+    ? `${renderField(step.fields[0])}
+      <button class="optional-toggle" id="optionalNoGosToggle" type="button" aria-expanded="${state.noGosExpanded}" aria-controls="optionalNoGos">
+        有一定避開的條件嗎？<span>選填</span>
+      </button>
+      ${state.noGosExpanded ? `<div class="optional-panel" id="optionalNoGos">${step.fields.slice(1).map(renderField).join("")}</div>` : ""}`
+    : step.fields.map(renderField).join("");
   $("questionArea").innerHTML = `<article class="question-card">
     <p class="eyebrow">買房方向診斷 · ${String(currentStep).padStart(2, "0")}</p>
     <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
-    <p class="question-hint">${escapeHtml(step.tip)}</p>
     <div class="advisor-tip"><strong>小魏提醒：</strong>${escapeHtml(step.tip)}</div>
-    ${step.fields.map(renderField).join("")}
+    ${questionFields}
   </article>`;
   $("backButton").onclick = goBack;
   $("nextButton").onclick = goNext;
