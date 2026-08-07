@@ -133,6 +133,20 @@ test("keeps no-go choices collapsed until the buyer opens the optional section",
   await expect(page.getByRole("button", { name: "西曬", exact: true })).toBeVisible();
 });
 
+test("keyboard no-go toggle preserves focus while opening and closing", async ({ page }) => {
+  await page.goto("/?testStep=priorities");
+  const toggle = page.getByRole("button", { name: /有一定避開的條件嗎/ });
+
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle).toBeFocused();
+
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toBeFocused();
+});
+
 test("can clear no special no-go by pressing it again", async ({ page }) => {
   await page.goto("/?testStep=priorities");
   await page.getByRole("button", { name: /有一定避開的條件嗎/ }).click();
