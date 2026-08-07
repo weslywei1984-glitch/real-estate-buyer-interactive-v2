@@ -305,6 +305,29 @@ test("the completion card stays readable when the animation never starts", async
   expect(opacities.every(value => value === "1")).toBe(true);
 });
 
+test("reduced motion reveals confirmed content without stagger delay", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.locator(".complete-card.animate-in")).toHaveCount(1);
+
+  const children = await page.locator(".complete-card.animate-in > *").evaluateAll(elements =>
+    elements.map(element => {
+      const style = getComputedStyle(element);
+      return { delay: style.animationDelay, opacity: style.opacity };
+    }));
+
+  expect(children.length).toBeGreaterThanOrEqual(8);
+  expect(children.every(({ delay }) => delay.split(",").every(value => Number.parseFloat(value) === 0))).toBe(true);
+  expect(children.every(({ opacity }) => opacity === "1")).toBe(true);
+});
+
 test("the confirmed page offers a one-tap call and the result page does not", async ({ page }) => {
   await page.goto("/?testStep=result");
   await expect(page.getByRole("link", { name: /直接撥打/ })).toHaveCount(0);
