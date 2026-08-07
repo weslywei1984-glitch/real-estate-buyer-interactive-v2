@@ -26,9 +26,9 @@ const answers = {
   mustHaves: ["電梯"],
   noGos: ["無管理"],
   otherNoGo: "不要頂樓",
-  moveInBudget: "10～30萬",
-  conditionTolerance: "小修可以接受",
-  decisionLimit: "還沒想過",
+  moveInBudget: "",
+  conditionTolerance: "",
+  decisionLimit: "",
   consent: true
 };
 
@@ -61,12 +61,17 @@ test("builds the versioned backend contract", () => {
   assert.deepEqual(payload.areas, ["東區", "北區"]);
   assert.deepEqual(payload.strategy, result.strategy);
   assert.equal(payload.consent, true);
+  assert.equal(payload.moveInBudget, "");
+  assert.equal(payload.conditionTolerance, "");
+  assert.equal(payload.decisionLimit, "");
   assert.equal("ip" in payload, false);
   assert.equal("fingerprint" in payload, false);
 });
 
 test("builds a readable summary from buyer answers and diagnosis", () => {
   const summary = buildSummary({ answers, result });
+
+  assert.doesNotMatch(summary, /入住整理預算|中古屋屋況接受度|出價心理底線/);
 
   assert.match(summary, /王小明/);
   assert.match(summary, /東區、北區/);

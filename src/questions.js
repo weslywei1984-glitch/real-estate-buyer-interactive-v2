@@ -22,12 +22,12 @@ export const QUESTION_STEPS = [
     fields: [
       {
         key: "downPayment", label: "可準備自備款", type: "single",
-        options: ["100萬以下", "100～200萬", "200～300萬", "300～500萬", "500萬以上", "自訂金額"],
+        options: ["100萬以下", "100～200萬", "200～300萬", "300～500萬", "500萬以上", "還不確定", "自訂金額"],
         custom: { option: "自訂金額", key: "customDownPayment", label: "自備款金額", placeholder: "例：250萬" }
       },
       {
         key: "monthlyMortgage", label: "舒服的每月房貸", type: "single",
-        options: ["2萬內", "2～3萬", "3～4萬", "4～5萬", "5萬以上", "自訂"],
+        options: ["2萬內", "2～3萬", "3～4萬", "4～5萬", "5萬以上", "希望小魏協助試算", "自訂"],
         custom: { option: "自訂", key: "customMonthlyMortgage", label: "每月可負擔金額", placeholder: "例：3萬5，或想請小魏協助試算" }
       }
     ]
@@ -52,7 +52,7 @@ export const QUESTION_STEPS = [
       { key: "propertyTypes", label: "物件類型", type: "multi", options: ["電梯大樓", "華廈／公寓", "透天", "電梯透天", "其他"] },
       {
         key: "agePreference", label: "屋齡接受度", type: "single",
-        options: ["預售屋", "5年內", "10年內", "20年內", "30年內", "自訂"],
+        options: ["預售屋", "5年內", "10年內", "20年內", "30年內", "不拘／看條件", "自訂"],
         custom: { option: "自訂", key: "customAgePreference", label: "可接受的屋齡", placeholder: "例：40年內可整理、或屋齡不拘" }
       },
       { key: "parking", label: "車位需求", type: "single", options: ["一定要平車", "車位即可", "有最好", "不需要"] }
@@ -62,18 +62,9 @@ export const QUESTION_STEPS = [
     id: "priorities", title: "什麼最不能妥協？",
     tip: "裝潢可以改，但地點、格局與每天的生活方式更值得先確認。",
     fields: [
-      { key: "mustHaves", label: "最重視，最多選 3 個", type: "multi", max: 3, options: ["地點", "格局", "採光通風", "安靜", "管理", "屋況", "生活機能", "停車", "價格"] },
+      { key: "mustHaves", label: "如果只能留 3 個，您最在意什麼？", type: "multi", max: 3, options: ["地點", "格局", "採光通風", "安靜", "管理", "屋況", "生活機能", "停車", "價格"] },
       { key: "noGos", label: "一定避開，可不選", type: "multi", exclusive: "無特殊忌諱", options: ["西曬", "頂樓", "特殊風水／路沖", "基地台或高壓電", "格局問題", "無特殊忌諱", "其他"] },
       { key: "otherNoGo", label: "其他避開條件", type: "text", placeholder: "請簡單說明", when: "otherNoGo" }
-    ]
-  },
-  {
-    id: "decision", title: "出價前，先確認這三件事",
-    tip: "可以心動，但決定之前要冷靜：房價以外的成本與心理底線，先想清楚。",
-    fields: [
-      { key: "moveInBudget", label: "入住整理預算（裝修、家具家電）", type: "single", options: ["幾乎不動，直接入住", "10萬內", "10～30萬", "30～50萬", "50萬以上", "還沒估過"] },
-      { key: "conditionTolerance", label: "中古屋屋況接受度", type: "single", options: ["要能直接入住", "小修可以接受", "願意重新整理", "看價格再決定"] },
-      { key: "decisionLimit", label: "出價心理底線", type: "single", options: ["已有明確上限，不會超過", "可以再彈性一點", "還沒想過", "希望小魏幫我抓"] }
     ]
   }
 ];
@@ -167,12 +158,6 @@ export function validateStep(stepId, rawAnswers) {
     if (answers.mustHaves.length > 3) errors.mustHaves = "最多選擇 3 個";
     if (answers.noGos.includes("其他") && !answers.otherNoGo.trim()) errors.otherNoGo = "請簡單說明其他避開條件";
   }
-  if (stepId === "decision") {
-    requireValue("moveInBudget", "請選擇入住整理預算");
-    requireValue("conditionTolerance", "請選擇屋況接受度");
-    requireValue("decisionLimit", "請選擇出價心理底線");
-  }
-
   const step = QUESTION_STEPS.find(item => item.id === stepId);
   for (const field of step?.fields || []) {
     if (!field.custom) continue;

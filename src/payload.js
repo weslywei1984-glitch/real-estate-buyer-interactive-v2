@@ -56,8 +56,10 @@ export function buildSummary({ answers, result }) {
     `家庭：${answers.householdSize || "未填"}；房數：${resolveAnswer(answers, "rooms") || "未填"}／${answers.thirdRoomUse || "無需填寫"}`,
     `物件：${(answers.propertyTypes || []).join("、") || "未填"}／${resolveAnswer(answers, "agePreference") || "未填"}／${answers.parking || "未填"}`,
     `必備：${(answers.mustHaves || []).join("、") || "未填"}`,
-    `入住整理預算：${answers.moveInBudget || "未填"}；屋況接受度：${answers.conditionTolerance || "未填"}`,
-    `出價心理底線：${answers.decisionLimit || "未填"}`,
+    ...(answers.moveInBudget || answers.conditionTolerance
+      ? [`入住整理預算：${answers.moveInBudget || "未填"}；屋況接受度：${answers.conditionTolerance || "未填"}`]
+      : []),
+    ...(answers.decisionLimit ? [`出價心理底線：${answers.decisionLimit}`] : []),
     `目前狀態：${result.status}`,
     ...result.strategy.map(item => `• ${item}`),
     "台南小魏 買厝作伙｜魏泉承｜0927-617-207"

@@ -9,10 +9,20 @@ import {
   validateStep
 } from "../src/questions.js";
 
-test("defines exactly seven core question screens", () => {
+test("defines exactly six required question screens without a decision screen", () => {
+  assert.equal(QUESTION_STEPS.length, 6);
   assert.deepEqual(QUESTION_STEPS.map(step => step.id), [
-    "intent", "location", "budget", "space", "property", "priorities", "decision"
+    "intent", "location", "budget", "space", "property", "priorities"
   ]);
+});
+
+test("offers low-pressure budget and flexible age choices", () => {
+  const budget = QUESTION_STEPS.find(step => step.id === "budget");
+  const property = QUESTION_STEPS.find(step => step.id === "property");
+
+  assert.ok(budget.fields.find(field => field.key === "downPayment").options.includes("還不確定"));
+  assert.ok(budget.fields.find(field => field.key === "monthlyMortgage").options.includes("希望小魏協助試算"));
+  assert.ok(property.fields.find(field => field.key === "agePreference").options.includes("不拘／看條件"));
 });
 
 test("life focus accepts multiple answers and collapses the no-fixed-place option", () => {
@@ -41,13 +51,10 @@ test("custom choices require the typed value and clear when deselected", () => {
   assert.equal(resolveAnswer(cleaned, "downPayment"), "300～500萬");
 });
 
-test("the decision step captures move-in cost, condition and price ceiling", () => {
+test("does not require removed decision answers", () => {
   const answers = createInitialAnswers();
-  assert.equal(validateStep("decision", answers).valid, false);
-  answers.moveInBudget = "10～30萬";
-  answers.conditionTolerance = "小修可以接受";
-  answers.decisionLimit = "還沒想過";
-  assert.equal(validateStep("decision", answers).valid, true);
+  answers.mustHaves = ["格局"];
+  assert.equal(validateStep("priorities", answers).valid, true);
 });
 
 test("third-room use is required only for three rooms or more", () => {
@@ -84,7 +91,7 @@ test("other no-go is an inline priorities field, not its own question screen", (
   const otherNoGo = priorities.fields.find(field => field.key === "otherNoGo");
   const answers = createInitialAnswers();
 
-  assert.equal(getVisibleStepIds(answers).length, 7);
+  assert.equal(getVisibleStepIds(answers).length, 6);
   assert.equal(QUESTION_STEPS.some(step => step.id === "otherNoGo"), false);
   assert.equal(otherNoGo.when, "otherNoGo");
 
