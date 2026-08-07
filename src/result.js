@@ -108,27 +108,33 @@ export function deriveResult(answers) {
   ];
   const strategy = [
     `看屋時優先確認${(answers.mustHaves || []).join("、") || "每天真正會用到的條件"}。`,
-    "不要只看裝潢；把格局、室外環境、白天與晚上的感受一起比較。"
+    "不要只看裝潢；把格局、室外環境、白天與晚上的感受一起比較。",
+    answers.moveInBudget
+      ? `入住整理預算以「${answers.moveInBudget}」為起點，再把修繕、家具家電、管理費與持有成本一起算進完整成本。`
+      : "房價之外，把修繕、家具家電、管理費與持有成本一起算進購屋完整成本。",
+    answers.conditionTolerance
+      ? `依「${answers.conditionTolerance}」比較中古屋，仍要確認窗邊、牆角、浴室與陽台的實際屋況。`
+      : "比較中古屋時，確認窗邊、牆角、浴室與陽台的實際屋況，不只看裝潢。",
+    answers.decisionLimit
+      ? `出價前再用「${answers.decisionLimit}」核對必要條件與出價底線。`
+      : "出價前先設定必要條件與可接受的出價底線，避免被現場氣氛推著走。"
   ];
   if ((answers.rooms === "3房" || answers.rooms === "3房以上") && ["偶爾來客", "還沒想好"].includes(answers.thirdRoomUse)) {
     strategy.unshift(`目前規劃${rooms}，但第三房用途仍有彈性，可同步比較兩房加彈性空間，避免為不常使用的房間增加負擔。`);
   }
-  if (answers.moveInBudget === "還沒估過") {
-    strategy.push("入住整理費用還沒估過：看屋時同步請小魏抓裝修、家具家電與管理費，房價以外的成本先算進來。");
-  }
-  if (answers.conditionTolerance === "要能直接入住") {
-    strategy.push("屋況希望能直接入住：中古屋要特別看窗邊、牆角、浴室與陽台，裝潢新不等於屋況好。");
-  }
-  if (["還沒想過", "希望小魏幫我抓"].includes(answers.decisionLimit)) {
-    strategy.push("出價前先設好心理底線：沒買到也能接受的價格，才不會被現場氣氛推著走。");
-  }
   const relevant = relevantVideoEpisodes(answers);
+  const videoQuestions = VIDEO_QUESTIONS.map(item => ({ ...item, relevant: relevant.has(item.ep) }));
+  const priorityPreview = videoQuestions.filter(item => item.relevant).slice(0, 3);
+  const budgetDetail = answers.moveInBudget
+    ? `入住整理預算「${answers.moveInBudget}」也一起估入。`
+    : "房價之外，再預留入住整理與修繕空間。";
   return {
     status,
     headline: `${status}｜先把生活與負擔對齊，再挑真正值得看的房子`,
     direction,
-    budgetReminder: `目前以自備款「${downPayment || "待確認"}」與舒服月付「${monthlyMortgage || "待確認"}」整理方向；入住整理預算「${answers.moveInBudget || "待確認"}」也一起估入。另外保留生活餘裕，並把修繕、管理費與持有成本一起算。實際貸款仍以銀行審核與個人條件為準。`,
+    budgetReminder: `目前以自備款「${downPayment || "待確認"}」與舒服月付「${monthlyMortgage || "待確認"}」整理方向；${budgetDetail}另外保留生活餘裕，並把修繕、管理費與持有成本一起算。實際貸款仍以銀行審核與個人條件為準。`,
     strategy,
-    videoQuestions: VIDEO_QUESTIONS.map(item => ({ ...item, relevant: relevant.has(item.ep) }))
+    priorityPreview,
+    videoQuestions
   };
 }

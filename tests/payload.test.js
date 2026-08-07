@@ -79,3 +79,13 @@ test("builds a readable summary from buyer answers and diagnosis", () => {
   assert.match(summary, /先安排生活圈帶看/);
   assert.match(summary, /台南小魏 買厝作伙｜魏泉承｜0927-617-207/);
 });
+
+test("does not label an unanswered optional legacy field as missing", () => {
+  const summary = buildSummary({
+    answers: { ...answers, moveInBudget: "10～30萬" },
+    result
+  });
+
+  assert.match(summary, /入住整理預算：10～30萬/);
+  assert.doesNotMatch(summary, /屋況接受度：未填|出價心理底線：未填/);
+});

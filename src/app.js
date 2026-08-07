@@ -461,6 +461,8 @@ function resultPreview(result) {
     <ul class="direction-list">${result.direction.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
     <h3>預算提醒</h3>
     <p>${escapeHtml(result.budgetReminder)}</p>
+    <h3>最值得先確認的 3 件事</h3>
+    <ol class="preview-priorities">${result.priorityPreview.map(item => `<li data-preview-priority>${escapeHtml(item.text)}</li>`).join("")}</ol>
   </article>`;
 }
 
@@ -520,13 +522,13 @@ function renderResult({ focus = true } = {}) {
     ? "確認資料入表中…"
     : state.submitAttempted && state.submitError
       ? "重新送出並確認"
-      : "送出並查看完整方向卡";
+      : "免費取得完整方向卡";
 
   $("resultArea").innerHTML = `${resultPreview(result)}
     <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
       <p class="eyebrow">最後一步 · 確認聯絡方式</p>
-      <h3>把完整方向卡整理給您</h3>
-      <p class="contact-intro">送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
+      <h3>免費取得完整看屋方向卡</h3>
+      <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}></label>
         <label class="field" for="phone"><span>手機號碼</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
@@ -577,6 +579,8 @@ function renderComplete({ focus = true } = {}) {
     return;
   }
   const result = snapshot.result;
+  const priorities = result.videoQuestions.filter(item => item.relevant).slice(0, 4);
+  const secondary = result.videoQuestions.filter(item => !priorities.some(priority => priority.ep === item.ep));
   $("resultArea").innerHTML = `${resultPreview(result)}
     <section class="result-card complete-card">
       <div class="complete-seal" aria-hidden="true">✓</div>
@@ -586,13 +590,23 @@ function renderComplete({ focus = true } = {}) {
       <ul class="strategy-list">${result.strategy.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
       <fieldset class="video-list">
         <legend>看屋前，問自己這 ${result.videoQuestions.length} 題</legend>
-        <div class="video-list-items">${result.videoQuestions.map(item => `
-          <label class="video-check-item ${item.relevant ? "relevant" : ""}" data-relevant="${item.relevant}">
+        <div class="video-list-items priority-video-list">${priorities.map(item => `
+          <label class="video-check-item relevant" data-priority-check data-relevant="true">
             <input type="checkbox">
             <span class="video-question-text">${escapeHtml(item.text)}</span>
-            ${item.relevant ? '<span class="video-relevant-badge">優先確認</span>' : ""}
+            <span class="video-relevant-badge">優先確認</span>
           </label>`).join("")}
         </div>
+        <details class="secondary-video-details">
+          <summary>查看其餘 6 項（完整 10 項）</summary>
+          <div class="video-list-items">${secondary.map(item => `
+            <label class="video-check-item ${item.relevant ? "relevant" : ""}" data-secondary-check data-relevant="${item.relevant}">
+              <input type="checkbox">
+              <span class="video-question-text">${escapeHtml(item.text)}</span>
+              ${item.relevant ? '<span class="video-relevant-badge">優先確認</span>' : ""}
+            </label>`).join("")}
+          </div>
+        </details>
       </fieldset>
       <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店</p>
       <div class="fallback-actions">
@@ -625,9 +639,9 @@ function applyLocalTestShortcut() {
     parking: "一定要平車",
     mustHaves: ["格局"],
     noGos: [],
-    moveInBudget: "10～30萬",
-    conditionTolerance: "小修可以接受",
-    decisionLimit: "已有明確上限，不會超過"
+    moveInBudget: "",
+    conditionTolerance: "",
+    decisionLimit: ""
   });
 
   if (target === "result") {

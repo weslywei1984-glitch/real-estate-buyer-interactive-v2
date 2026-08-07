@@ -12,6 +12,10 @@ const complete = {
   decisionLimit: "已有明確上限，不會超過"
 };
 
+function completeAnswers() {
+  return structuredClone(complete);
+}
+
 test("always exposes all ten video-derived questions", () => {
   assert.equal(VIDEO_QUESTIONS.length, 10);
   assert.deepEqual(VIDEO_QUESTIONS.map(item => item.ep), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -79,6 +83,24 @@ test("selects only three to five relevant viewing questions for every result", (
     const relevantCount = deriveResult(answers).videoQuestions.filter(item => item.relevant).length;
     assert.ok(relevantCount >= 3 && relevantCount <= 5, `relevant count was ${relevantCount}`);
   }
+});
+
+test("provides exactly three pre-contact priority questions", () => {
+  const result = deriveResult(completeAnswers());
+  assert.equal(result.priorityPreview.length, 3);
+  assert.ok(result.priorityPreview.every(item => item.relevant));
+});
+
+test("does not claim the removed decision questions were answered", () => {
+  const result = deriveResult({
+    ...completeAnswers(),
+    moveInBudget: "",
+    conditionTolerance: "",
+    decisionLimit: ""
+  });
+
+  assert.doesNotMatch(result.budgetReminder, /待確認.*入住整理預算/);
+  assert.ok(result.strategy.some(item => /修繕|屋況|出價底線/.test(item)));
 });
 
 test("changes relevant episodes deterministically for different buyer needs", () => {

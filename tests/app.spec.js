@@ -88,8 +88,34 @@ test("completes the six-screen path and reveals the result/contact page", async 
 
   await completeQuestionnaire(page);
   await expect(page.getByRole("heading", { name: /條件整理中/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "把完整方向卡整理給您" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "送出並查看完整方向卡" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "免費取得完整看屋方向卡" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "免費取得完整方向卡" })).toBeVisible();
+});
+
+test("shows three useful priorities before asking for contact details", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await expect(page.getByRole("heading", { name: "最值得先確認的 3 件事" })).toBeVisible();
+  await expect(page.locator("[data-preview-priority]")).toHaveCount(3);
+  await expect(page.getByRole("heading", { name: "免費取得完整看屋方向卡" })).toBeVisible();
+  await expect(page.getByText(/資料只用於回覆這次需求/)).toBeVisible();
+});
+
+test("shows four priority checks before the remaining six", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.locator("[data-priority-check] input[type=checkbox]")).toHaveCount(4);
+  const more = page.getByText("查看其餘 6 項（完整 10 項）");
+  await expect(more).toBeVisible();
+  await expect(page.locator("[data-secondary-check] input[type=checkbox]")).toHaveCount(6);
+  await expect(page.locator("[data-secondary-check]").first()).not.toBeVisible();
+  await more.click();
+  await expect(page.locator("[data-secondary-check]").first()).toBeVisible();
 });
 
 test("three rooms shows the third-room question and two rooms clears it", async ({ page }) => {
@@ -205,7 +231,7 @@ test("invalid phone cannot submit and exposes field guidance", async ({ page }) 
   await expect(page.getByText("請輸入 09 開頭的 10 碼手機號碼")).toBeVisible();
   await expect(page.getByLabel("手機號碼")).toHaveAttribute("aria-invalid", "true");
 
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await expect(page.getByRole("alert")).toContainText("09 開頭的 10 碼手機號碼");
   await expect(page.getByLabel("手機號碼")).toBeFocused();
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
@@ -223,7 +249,7 @@ test("submits even without crypto.randomUUID, as on a plain http origin", async 
 
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
 
   await expect(page.getByRole("button", { name: "確認資料入表中…" })).toBeDisabled();
   await expect.poll(() => page.evaluate(() => window.__submitCalls)).toBe(1);
@@ -238,7 +264,7 @@ test("the confirmed page plays a completion animation and settles fully readable
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await page.evaluate(() => window.__submissionControl.resolve({
     ok: true,
     submissionId: window.__capturedPayload.submissionId
@@ -265,7 +291,7 @@ test("the completion card stays readable when the animation never starts", async
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await page.evaluate(() => window.__submissionControl.resolve({
     ok: true,
     submissionId: window.__capturedPayload.submissionId
@@ -285,7 +311,7 @@ test("the confirmed page offers a one-tap call and the result page does not", as
 
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await page.evaluate(() => window.__submissionControl.resolve({
     ok: true,
     submissionId: window.__capturedPayload.submissionId
@@ -300,7 +326,7 @@ test("the confirmed page offers a one-tap call and the result page does not", as
 
 test("every missing contact field names itself instead of silently doing nothing", async ({ page }) => {
   await page.goto("/?testStep=result");
-  const submit = page.getByRole("button", { name: "送出並查看完整方向卡" });
+  const submit = page.getByRole("button", { name: "免費取得完整方向卡" });
 
   await expect(submit).toBeEnabled();
   await submit.click();
@@ -320,7 +346,7 @@ test("missing backend reports an honest error and keeps answers available", asyn
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
   await page.getByLabel("手機號碼").fill("0912345678");
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await expect(page.getByRole("alert")).toContainText("尚未設定獨立後端，資料還沒有送出");
   await expect(page.getByLabel("怎麼稱呼您？")).toHaveValue("王小姐");
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
@@ -337,7 +363,7 @@ test("submission locks mutable controls and confirmed success uses the immutable
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
 
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
 
   await expect(page.getByRole("button", { name: "確認資料入表中…" })).toBeDisabled();
   await expect(page.locator("#leadForm")).toHaveAttribute("aria-busy", "true");
@@ -375,7 +401,7 @@ test("confirmed result has ten keyboard-toggleable viewing checklist items", asy
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await page.evaluate(() => window.__submissionControl.resolve({
     ok: true,
     submissionId: window.__capturedPayload.submissionId
@@ -384,6 +410,8 @@ test("confirmed result has ten keyboard-toggleable viewing checklist items", asy
 
   const checklist = page.getByRole("group", { name: "看屋前，問自己這 10 題" });
   const checkboxes = checklist.getByRole("checkbox");
+  await expect(checkboxes).toHaveCount(4);
+  await checklist.getByText("查看其餘 6 項（完整 10 項）").click();
   await expect(checkboxes).toHaveCount(10);
 
   const relevantCount = await checklist.locator('[data-relevant="true"]').count();
@@ -405,7 +433,7 @@ test("submission error unlocks controls and preserves contact answers for retry"
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
 
-  await page.getByRole("button", { name: "送出並查看完整方向卡" }).click();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await expect(page.getByLabel("怎麼稱呼您？")).toBeDisabled();
   await page.evaluate(() => {
     const error = new Error("confirmation timeout");
