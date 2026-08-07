@@ -318,6 +318,7 @@ function renderField(field) {
   }
 
   const values = field.type === "multi" ? state.answers[field.key] : [state.answers[field.key]];
+  const compact = field.options.every(option => [...option].length <= 7) ? " compact" : "";
   const hint = field.max
     ? `<span class="field-guidance selected-summary" role="status">還能選 ${Math.max(0, field.max - values.length)} 個</span>`
     : field.type === "multi" ? `<span class="field-guidance">可複選</span>` : "";
@@ -329,7 +330,7 @@ function renderField(field) {
     : "";
   return `<fieldset data-field-group="${field.key}">
     <legend>${escapeHtml(field.label)}</legend>${hint}
-    <div class="choice-grid">
+    <div class="choice-grid${compact}">
       ${field.options.map(option => {
         const selected = values.includes(option);
         return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}"${disabled}>${escapeHtml(option)}</button>`;
@@ -396,8 +397,8 @@ function renderIntro({ focus = true } = {}) {
     <div>
       <p class="eyebrow">台南小魏 · 買厝作伙</p>
       <h1 tabindex="-1">找到適合生活的房子，從問對問題開始。</h1>
-      <p class="hero-copy">用 ${QUESTION_STEPS.length} 個關鍵選擇，先整理預算、空間、屋況與出價底線。不是替您打分數，而是把值得看的方向變清楚。</p>
-      <div class="intro-meta"><span>約 1 分鐘完成</span><span>可隨時返回修改</span></div>
+      <p class="hero-copy">用 6 個關鍵選擇，先整理生活圈、舒服負擔與真正底線。</p>
+      <div class="intro-meta"><span>約 60～90 秒完成</span><span>可隨時返回修改</span></div>
       <button class="primary" id="startButton" type="button">開始整理</button>
     </div>
     <aside class="consultant-note" aria-label="小魏提醒">

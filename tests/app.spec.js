@@ -527,3 +527,45 @@ test("mobile viewport has no horizontal overflow", async ({ page }) => {
   }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 });
+
+test("mobile intro keeps the trust message and start action in the first viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/");
+  await expect(page.getByText("資料只用於回覆本次需求")).toBeVisible();
+  await expect(page.getByRole("button", { name: "開始整理" })).toBeInViewport();
+});
+
+test("mobile priority page starts with only the core choices", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/?testStep=priorities");
+  await expect(page.locator('[data-field-group="mustHaves"] .choice')).toHaveCount(9);
+  await expect(page.locator('[data-field-group="noGos"]')).toHaveCount(0);
+  const columns = await page.locator('[data-field-group="mustHaves"] .choice-grid').evaluate(
+    element => getComputedStyle(element).gridTemplateColumns
+  );
+  expect(columns.split(" ").length).toBe(2);
+});
+
+test("reduced motion keeps the question readable without visible transitions", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?testStep=priorities");
+
+  const motion = await page.evaluate(() => {
+    const choice = getComputedStyle(document.querySelector(".choice"));
+    const card = getComputedStyle(document.querySelector(".question-card"));
+    const seconds = value => Number.parseFloat(value) * (value.endsWith("ms") ? 0.001 : 1);
+    return {
+      mediaMatches: matchMedia("(prefers-reduced-motion: reduce)").matches,
+      maximumTransitionSeconds: Math.max(...choice.transitionDuration.split(",").map(value => seconds(value.trim()))),
+      animationSeconds: seconds(card.animationDuration),
+      cardOpacity: card.opacity,
+      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior
+    };
+  });
+
+  expect(motion.mediaMatches).toBe(true);
+  expect(motion.maximumTransitionSeconds).toBeLessThanOrEqual(0.0000001);
+  expect(motion.animationSeconds).toBeLessThanOrEqual(0.0000001);
+  expect(motion.cardOpacity).toBe("1");
+  expect(motion.scrollBehavior).toBe("auto");
+});

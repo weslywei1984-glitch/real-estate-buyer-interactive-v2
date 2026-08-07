@@ -355,7 +355,7 @@ button:disabled {
   height: 100%;
   border-radius: inherit;
   background: var(--gold);
-  transition: width 0.25s ease;
+  transition: width 0.18s ease;
 }
 
 .progress-milestone {
@@ -467,7 +467,7 @@ legend,
   border: 1px solid var(--line);
   border-radius: 15px;
   background: var(--paper);
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .choice::after {
@@ -970,7 +970,9 @@ legend,
   }
 
   .privacy-chip {
-    display: none;
+    padding: 6px 8px;
+    white-space: nowrap;
+    font-size: 11px;
   }
 
   .hero,
@@ -980,7 +982,9 @@ legend,
   }
 
   .hero {
-    min-height: calc(100vh - 70px);
+    min-height: auto;
+    padding-top: 24px;
+    padding-bottom: 38px;
   }
 
   .hero-layout {
@@ -997,8 +1001,12 @@ legend,
     grid-template-columns: 1fr;
   }
 
+  .choice-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .choice {
-    min-height: 56px;
+    min-height: 52px;
   }
 
   .progress-row {
@@ -1058,8 +1066,8 @@ legend,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
+    animation-duration: 0.00001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0.00001ms !important;
   }
 }
