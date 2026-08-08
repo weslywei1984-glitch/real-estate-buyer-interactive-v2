@@ -426,12 +426,6 @@ test("missing backend reports an honest error and keeps answers available", asyn
 });
 
 test("submission locks mutable controls and confirmed success uses the immutable snapshot", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async text => { window.__copiedSummary = text; } }
-    });
-  });
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
@@ -465,9 +459,7 @@ test("submission locks mutable controls and confirmed success uses the immutable
     areas: ["永康區"]
   });
 
-  await page.getByRole("button", { name: "複製需求摘要" }).click();
-  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("區域：永康區");
-  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("區域：東區");
+  await expect(page.getByRole("button", { name: "儲存需求照片" })).toBeVisible();
 });
 
 test("confirmed result has ten keyboard-toggleable viewing checklist items", async ({ page }) => {
@@ -604,31 +596,6 @@ test("result preview uses revised questionnaire answers after a failed submissio
   await expect(preview).not.toContainText("拿掉裝潢加分後，格局仍符合每天的使用方式嗎？");
 });
 
-test("copied summary uses revised contact details after a failed submission", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async text => { window.__copiedSummary = text; } }
-    });
-  });
-  await page.goto("/?testStep=result");
-  await installDeferredSubmissionMock(page);
-  await fillValidContact(page);
-
-  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
-  await page.evaluate(() => {
-    const error = new Error("confirmation timeout");
-    error.code = "SUBMISSION_NOT_CONFIRMED";
-    window.__submissionControl.reject(error);
-  });
-  await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
-
-  await page.getByLabel("怎麼稱呼您？").fill("陳先生");
-  await page.getByRole("button", { name: "複製需求摘要" }).click();
-  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("聯絡人：陳先生");
-  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).not.toContain("聯絡人：王小姐");
-});
-
 test("correcting related text fields clears field-level ARIA errors", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "開始整理" }).click();
@@ -679,19 +646,47 @@ test("focus indicator has at least 3 to 1 contrast on both card backgrounds", as
   expect(contrastRatio(outlineColor, "rgb(247, 241, 230)")).toBeGreaterThanOrEqual(3);
 });
 
-test("LINE contact uses the approved add-friend link and copies the demand summary", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async text => { window.__copiedSummary = text; } }
-    });
-  });
+test("LINE contact uses the approved add-friend link", async ({ page }) => {
   await page.goto("/?testStep=result");
   const lineHref = await page.getByRole("link", { name: "改用 LINE 聯絡" }).getAttribute("href");
   expect(lineHref).toBe("https://line.me/R/ti/p/%40tainanwei");
-  await page.getByRole("button", { name: "複製需求摘要" }).click();
-  await expect(page.locator("#toast")).toHaveText("需求摘要已複製");
-  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("台南小魏 買厝作伙");
+});
+
+test("儲存需求照片 downloads the public result card before contact", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  const downloadEvent = page.waitForEvent("download");
+
+  await page.getByRole("button", { name: "儲存需求照片" }).click();
+  const download = await downloadEvent;
+  if (process.env.RESULT_IMAGE_ARTIFACT) {
+    await download.saveAs(process.env.RESULT_IMAGE_ARTIFACT);
+  }
+
+  const now = new Date();
+  const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0"))
+    .join("");
+  expect(download.suggestedFilename()).toBe(`台南小魏-買房方向卡-${date}.png`);
+  await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
+});
+
+test("儲存需求照片 downloads the same public card after confirmed contact", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
+
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "儲存需求照片" }).click();
+  const download = await downloadEvent;
+
+  expect(download.suggestedFilename()).toMatch(/^台南小魏-買房方向卡-\d{8}\.png$/);
+  await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
 });
 
 test("mobile viewport has no horizontal overflow", async ({ page }) => {

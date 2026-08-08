@@ -7,6 +7,7 @@ import {
   validateStep
 } from "./questions.js";
 import { deriveResult } from "./result.js";
+import { downloadResultImage } from "./result-image.js";
 import { buildPayload, buildSummary } from "./payload.js";
 import { isValidContact, normalizeContact } from "./contact.js";
 import { submitLead } from "./api.js";
@@ -296,15 +297,19 @@ async function handleSubmit() {
   }
 }
 
-async function copySummary() {
+async function saveResultImage() {
   const snapshot = state.phase === "complete" ? state.confirmedSubmission : currentActiveSubmission();
-  const text = snapshot?.summary
-    || buildSummary({ answers: state.answers, result: deriveResult(state.answers) });
   try {
-    await navigator.clipboard.writeText(text);
-    showToast("需求摘要已複製");
+    await downloadResultImage({
+      result: snapshot?.result || deriveResult(state.answers),
+      answers: snapshot?.answers || state.answers,
+      phone: PHONE,
+      documentRef: document,
+      urlRef: URL
+    });
+    showToast("需求照片已儲存");
   } catch {
-    window.prompt("複製這段需求摘要：", text);
+    showToast("需求照片儲存失敗，請稍後再試");
   }
 }
 
@@ -506,7 +511,7 @@ function bindContactEvents() {
     handleSubmit();
   });
   $("resultBack").addEventListener("click", goBack);
-  $("copyButton").addEventListener("click", copySummary);
+  $("saveImageButton").addEventListener("click", saveResultImage);
 }
 
 function updateSubmitState() {
@@ -554,7 +559,7 @@ function renderResult({ focus = true } = {}) {
       </div>
       <div class="fallback-actions">
         <button id="resultBack" type="button"${locked}>回上一步</button>
-        <button id="copyButton" type="button">複製需求摘要</button>
+        <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
         <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
         <a href="${LINE_URL}" target="_blank" rel="noopener">改用 LINE 聯絡</a>
       </div>
@@ -624,12 +629,12 @@ function renderComplete({ focus = true } = {}) {
       </fieldset>
       <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店</p>
       <div class="fallback-actions">
-        <button id="copyButton" type="button">複製需求摘要</button>
+        <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
         <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
         <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找台南小魏</a>
       </div>
     </section>`;
-  $("copyButton").addEventListener("click", copySummary);
+  $("saveImageButton").addEventListener("click", saveResultImage);
   playCompleteAnimation();
   if (focus) focusElement($("resultArea").querySelector("h3[tabindex]"));
 }
