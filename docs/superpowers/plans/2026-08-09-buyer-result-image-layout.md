@@ -19,16 +19,17 @@
 
 ---
 
-### Task 1: Lock the new Canvas composition with failing tests
+### Task 1: Implement the refined Canvas composition with TDD
 
 **Files:**
+- Modify: `src/result-image.js:135-249`
 - Modify: `tests/result-image.test.js:8-32`
 - Modify: `tests/result-image.test.js:241-280`
 - Modify: `tests/app.spec.js:744-820`
 
 **Interfaces:**
-- Consumes: existing `renderResultImage({ answers })`, fake Canvas `context.drawn`, and browser Canvas `fillText()` interception.
-- Produces: regression evidence that public footer text is centered, the fixed phone appears exactly once below the content area, and no header phone remains.
+- Consumes: sanitized `result` created by `deriveImageResult(answers)`, existing `renderResultImage({ answers })`, fake Canvas `context.drawn`, browser Canvas `fillText()` interception, and the existing drawing helpers.
+- Produces: unchanged `renderResultImage({ answers }) -> HTMLCanvasElement` and `downloadResultImage({ answers, documentRef, urlRef }) -> Promise<void>` behavior with regression evidence that the public footer is centered, the fixed phone appears exactly once below the content area, and no header phone remains.
 
 - [ ] **Step 1: Record alignment and color in fake Canvas draws**
 
@@ -102,20 +103,7 @@ npx.cmd playwright test tests/app.spec.js --grep "polluted long-text canvas" --p
 
 Expected: the new Node assertion fails because the phone is drawn twice and the footer is left/right aligned; desktop and mobile fail on placement because the current footer is not centered.
 
----
-
-### Task 2: Implement the refined direction-card layout
-
-**Files:**
-- Modify: `src/result-image.js:135-249`
-- Test: `tests/result-image.test.js`
-- Test: `tests/app.spec.js`
-
-**Interfaces:**
-- Consumes: sanitized `result` created by `deriveImageResult(answers)` and existing helpers `setFont()`, `drawWrappedText()`, `drawRule()`, `drawSectionLabel()`, and `roundedRect()`.
-- Produces: unchanged `renderResultImage({ answers }) -> HTMLCanvasElement` and `downloadResultImage({ answers, documentRef, urlRef }) -> Promise<void>` behavior with a new visual composition.
-
-- [ ] **Step 1: Remove the header phone draw**
+- [ ] **Step 5: Remove the header phone draw**
 
 Delete only this header block; keep `BRAND_PHONE` for the footer:
 
@@ -127,7 +115,7 @@ context.fillText(BRAND_PHONE, 972, 94);
 context.textAlign = "start";
 ```
 
-- [ ] **Step 2: Rebalance title and content typography**
+- [ ] **Step 6: Rebalance title and content typography**
 
 Apply these explicit Canvas values inside `drawCard()`:
 
@@ -149,7 +137,7 @@ let directionY = 474;
 
 Use `lineHeight: 36` and `+ 12` spacing for direction bullets. Set `budgetLabelY` to `Math.max(664, directionY + 18)`, budget body to 25 px with `lineHeight: 34`, and `prioritiesLabelY` to `Math.max(852, budgetEnd + 34)`. Keep three priorities, set their body line-height to 33, and preserve the existing maximum line counts.
 
-- [ ] **Step 3: Replace the footer with a centered three-line block**
+- [ ] **Step 7: Replace the footer with a centered three-line block**
 
 Use a taller footer so the three levels breathe while remaining within the border:
 
@@ -172,7 +160,7 @@ context.fillText(BRAND_PHONE, 540, 1250);
 context.textAlign = "start";
 ```
 
-- [ ] **Step 4: Run focused tests and confirm GREEN**
+- [ ] **Step 8: Run focused tests and confirm GREEN**
 
 Run:
 
@@ -183,7 +171,7 @@ npx.cmd playwright test tests/app.spec.js --grep "polluted long-text canvas" --p
 
 Expected: all selected Node and desktop/mobile Playwright tests pass; the phone count is one and all three footer lines report `{ x: 540, textAlign: "center" }`.
 
-- [ ] **Step 5: Run the complete automated verification**
+- [ ] **Step 9: Run the complete automated verification**
 
 Run:
 
@@ -198,7 +186,7 @@ git diff --check
 
 Expected: every Node and desktop/mobile Playwright test passes, all syntax checks exit 0, and `git diff --check` emits no errors.
 
-- [ ] **Step 6: Commit the implementation**
+- [ ] **Step 10: Commit the implementation**
 
 ```powershell
 git add -- src/result-image.js tests/result-image.test.js tests/app.spec.js
@@ -207,7 +195,7 @@ git commit -m "feat: refine buyer result image layout"
 
 ---
 
-### Task 3: Produce, inspect, and release the real PNG
+### Task 2: Produce, inspect, and release the real PNG
 
 **Files:**
 - Verify: `src/result-image.js`
