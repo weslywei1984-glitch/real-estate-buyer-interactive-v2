@@ -8,6 +8,16 @@ const PAPER = "#fffdf8";
 const PAPER_WARM = "#f7f1e6";
 const BODY_FONT = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
 const DISPLAY_FONT = '"Noto Serif TC", "Songti TC", "PMingLiU", "Microsoft JhengHei", serif';
+const CONTACT_REDACTION = "[聯絡資訊已隱藏]";
+
+function redactContactDetails(value) {
+  return String(value || "")
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, CONTACT_REDACTION)
+    .replace(/(^|\D)(09(?:[\s.\-–—]?\d){8})(?!\d)/gu, (_, prefix) => `${prefix}${CONTACT_REDACTION}`)
+    .replace(/[A-Za-z0-9._-]+/g, token => (
+      /[A-Za-z]/.test(token) ? CONTACT_REDACTION : token
+    ));
+}
 
 function setFont(context, size, weight = 500, family = BODY_FONT) {
   context.font = `${weight} ${size}px ${family}`;
@@ -62,7 +72,7 @@ function wrappedLines(context, value, maxWidth, maxLines) {
 }
 
 function drawWrappedText(context, value, { x, y, maxWidth, maxLines, lineHeight }) {
-  const lines = wrappedLines(context, value, maxWidth, maxLines);
+  const lines = wrappedLines(context, redactContactDetails(value), maxWidth, maxLines);
   lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
   return y + lines.length * lineHeight;
 }
@@ -115,7 +125,7 @@ function drawCard({ result, phone, documentRef }) {
   context.fillText(phone || "0927-617-207", 972, 94);
   context.textAlign = "start";
 
-  const status = String(result?.status || "方向整理完成");
+  const status = redactContactDetails(result?.status || "方向整理完成");
   setFont(context, 22, 800);
   const statusWidth = Math.min(context.measureText(status).width + 48, 360);
   context.fillStyle = GOLD_PALE;
@@ -227,16 +237,32 @@ export async function downloadResultImage({ result, phone, documentRef = globalT
   const blob = await toPngBlob(canvas);
   const filename = `台南小魏-買房方向卡-${dateStamp()}.png`;
   const objectUrl = urlRef.createObjectURL(blob);
-  const link = documentRef.createElement("a");
-  link.href = objectUrl;
-  link.download = filename;
-  link.style && (link.style.display = "none");
+  let link;
+  let operationError;
   try {
+    link = documentRef.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    link.style && (link.style.display = "none");
     documentRef.body?.append(link);
     link.click();
-  } finally {
-    link.remove();
+  } catch (error) {
+    operationError = error;
+  }
+
+  let removalError;
+  try {
+    link?.remove();
+  } catch (error) {
+    removalError = error;
+  }
+
+  if (operationError || removalError) {
+    urlRef.revokeObjectURL(objectUrl);
+  } else {
     setTimeout(() => urlRef.revokeObjectURL(objectUrl), 0);
   }
+  if (operationError) throw operationError;
+  if (removalError) throw removalError;
   return filename;
 }

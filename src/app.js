@@ -289,7 +289,7 @@ async function handleSubmit() {
   } catch (error) {
     state.submitError = error.code === "SUBMISSION_NOT_CONFIRMED"
       ? "資料尚未確認入表，請重新送出或改用 LINE。答案都還保留著。"
-      : "目前無法送出，答案已保留。請重新送出、複製摘要或改用 LINE。";
+      : "目前無法送出，答案已保留。請重新送出、儲存需求照片或改用 LINE。";
   } finally {
     state.submitting = false;
     render({ focus: state.phase === "complete" });
@@ -546,7 +546,7 @@ function renderResult({ focus = true } = {}) {
     <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
       <p class="eyebrow">最後一步 · 確認聯絡方式</p>
       <h3>免費取得完整看屋方向卡</h3>
-      <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
+      <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可儲存需求照片或改用 LINE。</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}><span class="field-guidance name-guidance" aria-hidden="true"></span></label>
         <label class="field" for="phone"><span>手機號碼 or LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>

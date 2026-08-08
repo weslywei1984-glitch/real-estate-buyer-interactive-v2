@@ -65,6 +65,21 @@ async function completeQuestionnaire(page) {
   await page.getByRole("button", { name: "查看方向" }).click();
 }
 
+async function readDownloadBytes(download) {
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+function expectResultPng(bytes) {
+  expect(bytes.length).toBeGreaterThan(10_000);
+  expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+  expect(bytes.subarray(12, 16).toString("ascii")).toBe("IHDR");
+  expect(bytes.readUInt32BE(16)).toBe(1080);
+  expect(bytes.readUInt32BE(20)).toBe(1350);
+}
+
 test("buyer test hook exists only on exact local hostnames", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => typeof window.__buyerAppTest)).toBe("object");
@@ -105,6 +120,7 @@ test("shows three useful priorities before asking for contact details", async ({
   await expect(page.locator("[data-preview-priority]")).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "免費取得完整看屋方向卡" })).toBeVisible();
   await expect(page.getByText(/資料只用於回覆這次需求/)).toBeVisible();
+  await expect(page.getByText(/若目前不方便送出，也可儲存需求照片或改用 LINE/)).toBeVisible();
 });
 
 test("shows four priority checks before the remaining six", async ({ page }) => {
@@ -514,6 +530,17 @@ test("submission error unlocks controls and preserves contact answers for retry"
   await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
 });
 
+test("generic submission failure offers 儲存需求照片 instead of the removed copy action", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.reject(new Error("network failed")));
+
+  await expect(page.getByRole("alert")).toContainText("儲存需求照片或改用 LINE");
+  await expect(page.getByRole("alert")).not.toContainText("複製摘要");
+});
+
 test("retry after an uncertain failure reuses the same submission id", async ({ page }) => {
   await page.goto("/?testStep=result");
   await installDeferredSubmissionMock(page);
@@ -667,6 +694,7 @@ test("儲存需求照片 downloads the public result card before contact", async
     .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0"))
     .join("");
   expect(download.suggestedFilename()).toBe(`台南小魏-買房方向卡-${date}.png`);
+  expectResultPng(await readDownloadBytes(download));
   await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
 });
 
@@ -686,6 +714,63 @@ test("儲存需求照片 downloads the same public card after confirmed contact"
   const download = await downloadEvent;
 
   expect(download.suggestedFilename()).toMatch(/^台南小魏-買房方向卡-\d{8}\.png$/);
+  await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
+});
+
+test("儲存需求照片 keeps a real long-text canvas downloadable with a safe footer", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  const canvasMetrics = await page.evaluate(async () => {
+    const repeated = "超長自訂生活圈與通勤需求".repeat(60);
+    Object.assign(window.__buyerAppTest.state.answers, {
+      areas: [],
+      customArea: `${repeated} 0911222333 private.line.id`,
+      moveInBudget: `希望保留生活餘裕並逐項估算${repeated} buyer@example.com`
+    });
+    window.__buyerAppTest.render({ focus: false });
+
+    const [{ deriveResult }, { renderResultImage }] = await Promise.all([
+      import("/src/result.js"),
+      import("/src/result-image.js")
+    ]);
+    const result = deriveResult(window.__buyerAppTest.state.answers);
+    const drawn = [];
+    const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function recordFillText(value, ...args) {
+      drawn.push(String(value));
+      return originalFillText.call(this, value, ...args);
+    };
+    let canvas;
+    try {
+      canvas = renderResultImage({
+        result,
+        answers: window.__buyerAppTest.state.answers,
+        phone: "0927-617-207"
+      });
+    } finally {
+      CanvasRenderingContext2D.prototype.fillText = originalFillText;
+    }
+    const footerPixel = Array.from(canvas.getContext("2d").getImageData(110, 1210, 1, 1).data);
+    const blobSize = await new Promise(resolve => canvas.toBlob(blob => resolve(blob?.size || 0), "image/png"));
+    return { width: canvas.width, height: canvas.height, footerPixel, blobSize, drawnText: drawn.join("") };
+  });
+  expect(canvasMetrics).toMatchObject({
+    width: 1080,
+    height: 1350,
+    footerPixel: [24, 53, 46, 255],
+    blobSize: expect.any(Number)
+  });
+  expect(canvasMetrics.blobSize).toBeGreaterThan(10_000);
+  expect(canvasMetrics.drawnText).not.toContain("0911222333");
+  expect(canvasMetrics.drawnText).not.toContain("private.line.id");
+  expect(canvasMetrics.drawnText).not.toContain("buyer@example.com");
+
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "儲存需求照片" }).click();
+  const download = await downloadEvent;
+  if (process.env.RESULT_IMAGE_STRESS_ARTIFACT) {
+    await download.saveAs(process.env.RESULT_IMAGE_STRESS_ARTIFACT);
+  }
+  expectResultPng(await readDownloadBytes(download));
   await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
 });
 

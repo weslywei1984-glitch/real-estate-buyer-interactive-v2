@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { downloadResultImage, renderResultImage } from "../src/result-image.js";
+import { deriveResult } from "../src/result.js";
 
 function createFakeCanvas({ blob = new Blob(["png"], { type: "image/png" }) } = {}) {
   const drawn = [];
@@ -103,6 +104,64 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
   }
 });
 
+test("result image redacts contact-shaped free text that entered through diagnosis answers", () => {
+  const canvas = createFakeCanvas();
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => canvas };
+  const answers = {
+    purpose: "自住",
+    timeline: "3個月內",
+    areas: [],
+    customArea: "0911222333 private.line.id",
+    lifeFocus: ["工作通勤"],
+    downPayment: "200～300萬",
+    monthlyMortgage: "2～3萬",
+    propertyTypes: ["電梯大樓"],
+    agePreference: "20年內",
+    parking: "一定要平車",
+    mustHaves: ["格局"],
+    noGos: [],
+    moveInBudget: "請洽 0911-222-333 或 buyer@example.com",
+    conditionTolerance: "",
+    decisionLimit: ""
+  };
+  const result = deriveResult(answers);
+  result.status += " lineplain ab";
+  result.headline += "\nline-id line_id";
+  result.priorityPreview = [
+    { text: "聯絡 linename" },
+    { text: "聯絡 line.name" },
+    { text: "聯絡 line-name_line" }
+  ];
+
+  try {
+    renderResultImage({ result, answers, phone: "0927-617-207" });
+    const text = canvas.context.drawn.map(entry => entry.value).join("");
+
+    for (const privateValue of [
+      "0911222333",
+      "private.line.id",
+      "0911-222-333",
+      "buyer@example.com",
+      "lineplain",
+      "ab",
+      "line-id",
+      "line_id",
+      "linename",
+      "line.name",
+      "line-name_line"
+    ]) {
+      assert.doesNotMatch(text, new RegExp(privateValue.replaceAll(".", "\\.")));
+    }
+    assert.match(text, /這次以自住為主/);
+    assert.match(text, /預算提醒/);
+    assert.match(text, /聯絡資訊已隱藏/);
+    assert.match(text, /0927-617-207/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("download creates a dated PNG link and revokes its temporary object URL", async () => {
   const canvas = createFakeCanvas();
   const clicks = [];
@@ -199,4 +258,79 @@ test("download revokes the object URL even when the mobile link click fails", as
   );
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(revoked, ["blob:blocked-download"]);
+});
+
+test("download revokes the object URL when link creation fails", async () => {
+  const canvas = createFakeCanvas();
+  const revoked = [];
+  const documentRef = {
+    createElement(tagName) {
+      if (tagName === "canvas") return canvas;
+      throw new Error("link creation blocked");
+    },
+    body: { append() {} }
+  };
+  const urlRef = {
+    createObjectURL() { return "blob:create-failure"; },
+    revokeObjectURL(url) { revoked.push(url); }
+  };
+
+  await assert.rejects(
+    downloadResultImage({ result: publicResult(), answers: {}, phone: "0927-617-207", documentRef, urlRef }),
+    /link creation blocked/
+  );
+  assert.deepEqual(revoked, ["blob:create-failure"]);
+});
+
+test("download revokes the object URL when assigning link attributes fails", async () => {
+  const canvas = createFakeCanvas();
+  const revoked = [];
+  const documentRef = {
+    createElement(tagName) {
+      if (tagName === "canvas") return canvas;
+      const link = { click() {}, remove() {} };
+      Object.defineProperty(link, "download", {
+        set() { throw new Error("attribute assignment blocked"); }
+      });
+      return link;
+    },
+    body: { append() {} }
+  };
+  const urlRef = {
+    createObjectURL() { return "blob:attribute-failure"; },
+    revokeObjectURL(url) { revoked.push(url); }
+  };
+
+  await assert.rejects(
+    downloadResultImage({ result: publicResult(), answers: {}, phone: "0927-617-207", documentRef, urlRef }),
+    /attribute assignment blocked/
+  );
+  assert.deepEqual(revoked, ["blob:attribute-failure"]);
+});
+
+test("download revokes the object URL when temporary link removal fails", async () => {
+  const canvas = createFakeCanvas();
+  const revoked = [];
+  const documentRef = {
+    createElement(tagName) {
+      if (tagName === "canvas") return canvas;
+      return {
+        href: "",
+        download: "",
+        click() {},
+        remove() { throw new Error("link removal blocked"); }
+      };
+    },
+    body: { append() {} }
+  };
+  const urlRef = {
+    createObjectURL() { return "blob:remove-failure"; },
+    revokeObjectURL(url) { revoked.push(url); }
+  };
+
+  await assert.rejects(
+    downloadResultImage({ result: publicResult(), answers: {}, phone: "0927-617-207", documentRef, urlRef }),
+    /link removal blocked/
+  );
+  assert.deepEqual(revoked, ["blob:remove-failure"]);
 });
