@@ -157,12 +157,6 @@ function drawCard({ result, documentRef }) {
   setFont(context, 24, 800);
   context.fillText("買厝作伙", 120, 127);
 
-  context.textAlign = "right";
-  context.fillStyle = INK_SOFT;
-  setFont(context, 24, 700);
-  context.fillText(BRAND_PHONE, 972, 94);
-  context.textAlign = "start";
-
   const status = String(result?.status || "方向整理完成");
   setFont(context, 22, 800);
   const statusWidth = Math.min(context.measureText(status).width + 48, 360);
@@ -173,20 +167,20 @@ function drawCard({ result, documentRef }) {
   context.fillText(status, 108, 198);
 
   context.fillStyle = INK;
-  setFont(context, 57, 800, DISPLAY_FONT);
+  setFont(context, 52, 800, DISPLAY_FONT);
   drawWrappedText(context, result?.headline, {
     x: 84,
     y: 258,
     maxWidth: 912,
     maxLines: 2,
-    lineHeight: 68
+    lineHeight: 70
   });
-  drawRule(context, 382);
+  drawRule(context, 390);
 
-  drawSectionLabel(context, "目前找房方向", 412);
+  drawSectionLabel(context, "目前找房方向", 422);
   context.fillStyle = INK_SOFT;
-  setFont(context, 28, 600);
-  let directionY = 462;
+  setFont(context, 27, 600);
+  let directionY = 474;
   for (const item of (result?.direction || []).slice(0, 2)) {
     context.fillStyle = GOLD;
     context.fillRect(88, directionY + 11, 8, 8);
@@ -196,23 +190,23 @@ function drawCard({ result, documentRef }) {
       y: directionY,
       maxWidth: 858,
       maxLines: 3,
-      lineHeight: 34
-    }) + 10;
+      lineHeight: 36
+    }) + 12;
   }
 
-  const budgetLabelY = Math.max(670, directionY + 10);
+  const budgetLabelY = Math.max(664, directionY + 18);
   drawSectionLabel(context, "預算提醒", budgetLabelY);
   context.fillStyle = INK_SOFT;
-  setFont(context, 26, 500);
+  setFont(context, 25, 500);
   const budgetEnd = drawWrappedText(context, result?.budgetReminder, {
     x: 84,
     y: budgetLabelY + 50,
     maxWidth: 912,
     maxLines: 4,
-    lineHeight: 32
+    lineHeight: 34
   });
 
-  const prioritiesLabelY = Math.max(878, budgetEnd + 35);
+  const prioritiesLabelY = Math.max(852, budgetEnd + 34);
   drawSectionLabel(context, "最值得先確認的 3 件事", prioritiesLabelY);
   context.fillStyle = INK;
   setFont(context, 25, 700);
@@ -228,22 +222,22 @@ function drawCard({ result, documentRef }) {
       y: priorityY,
       maxWidth: 840,
       maxLines: 2,
-      lineHeight: 31
+      lineHeight: 33
     }) + 9;
   });
 
   context.fillStyle = INK;
-  roundedRect(context, 84, 1196, 912, 100, 18);
+  roundedRect(context, 84, 1144, 912, 152, 18);
   context.fill();
+  context.textAlign = "center";
   context.fillStyle = PAPER;
-  setFont(context, 24, 700);
-  context.fillText("想了解台南行情、買房、賣房，都可以找我聊聊。", 112, 1217);
+  setFont(context, 23, 700);
+  context.fillText("想了解台南行情、買房、賣房，都可以找我聊聊。", 540, 1167);
   context.fillStyle = GOLD_PALE;
-  setFont(context, 20, 600);
-  context.fillText("魏泉承｜永慶不動產-小東南紡店", 112, 1257);
-  context.textAlign = "right";
+  setFont(context, 19, 600);
+  context.fillText("魏泉承｜永慶不動產-小東南紡店", 540, 1211);
   setFont(context, 22, 800);
-  context.fillText(BRAND_PHONE, 968, 1255);
+  context.fillText(BRAND_PHONE, 540, 1250);
   context.textAlign = "start";
 
   return canvas;

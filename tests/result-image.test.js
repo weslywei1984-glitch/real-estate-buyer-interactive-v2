@@ -29,7 +29,14 @@ function createFakeCanvas({ blob = new Blob(["png"], { type: "image/png" }) } = 
       return { width: Array.from(String(value)).length * 20 };
     },
     fillText(value, x, y) {
-      drawn.push({ value: String(value), x, y, font: this.font });
+      drawn.push({
+        value: String(value),
+        x,
+        y,
+        font: this.font,
+        textAlign: this.textAlign,
+        fillStyle: this.fillStyle
+      });
     }
   };
   return {
@@ -276,6 +283,30 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
     for (const privateValue of ["測試買方林小姐", "0911222333", "private.line.id"]) {
       assert.doesNotMatch(text, new RegExp(privateValue.replaceAll(".", "\\.")));
     }
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("result image removes the header phone and centers the three-line footer", () => {
+  const canvas = createFakeCanvas();
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => canvas };
+
+  try {
+    renderResultImage({ answers: publicAnswers() });
+    const footerValues = [
+      "想了解台南行情、買房、賣房，都可以找我聊聊。",
+      "魏泉承｜永慶不動產-小東南紡店",
+      "0927-617-207"
+    ];
+    const footerDraws = canvas.context.drawn.filter(entry => footerValues.includes(entry.value));
+    const phones = canvas.context.drawn.filter(entry => entry.value === "0927-617-207");
+
+    assert.equal(phones.length, 1);
+    assert.ok(phones[0].y >= 1200);
+    assert.deepEqual(footerDraws.map(entry => entry.x), [540, 540, 540]);
+    assert.deepEqual(footerDraws.map(entry => entry.textAlign), ["center", "center", "center"]);
   } finally {
     globalThis.document = previousDocument;
   }

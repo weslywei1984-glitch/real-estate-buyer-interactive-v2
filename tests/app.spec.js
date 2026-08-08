@@ -773,7 +773,7 @@ test("儲存需求照片 keeps a polluted long-text canvas downloadable with a s
     const drawn = [];
     const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function recordFillText(value, ...args) {
-      drawn.push(String(value));
+      drawn.push({ value: String(value), x: args[0], y: args[1], textAlign: this.textAlign });
       return originalFillText.call(this, value, ...args);
     };
     let canvas;
@@ -788,7 +788,14 @@ test("儲存需求照片 keeps a polluted long-text canvas downloadable with a s
     }
     const footerPixel = Array.from(canvas.getContext("2d").getImageData(110, 1210, 1, 1).data);
     const blobSize = await new Promise(resolve => canvas.toBlob(blob => resolve(blob?.size || 0), "image/png"));
-    return { width: canvas.width, height: canvas.height, footerPixel, blobSize, drawnText: drawn.join("") };
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      footerPixel,
+      blobSize,
+      draws: drawn,
+      drawnText: drawn.map(draw => draw.value).join("")
+    };
   });
   expect(canvasMetrics).toMatchObject({
     width: 1080,
@@ -797,6 +804,11 @@ test("儲存需求照片 keeps a polluted long-text canvas downloadable with a s
     blobSize: expect.any(Number)
   });
   expect(canvasMetrics.blobSize).toBeGreaterThan(10_000);
+  const phoneDraws = canvasMetrics.draws.filter(draw => draw.value === "0927-617-207");
+  expect(phoneDraws).toHaveLength(1);
+  expect(phoneDraws[0]).toMatchObject({ x: 540, textAlign: "center" });
+  expect(phoneDraws[0].y).toBeGreaterThanOrEqual(1200);
+  expect(canvasMetrics.draws.some(draw => draw.value === "0927-617-207" && draw.y < 1100)).toBe(false);
   for (const privateValue of [
     "private.line.id",
     "0911222333",
