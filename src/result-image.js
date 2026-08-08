@@ -1,4 +1,5 @@
 import { deriveResult } from "./result.js";
+import { needsThirdRoomUse, QUESTION_STEPS } from "./questions.js";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
@@ -24,10 +25,31 @@ const IMAGE_PRIVATE_KEYS = [
   "conditionTolerance",
   "decisionLimit"
 ];
+const IMAGE_CHOICE_FIELDS = QUESTION_STEPS
+  .flatMap(step => step.fields)
+  .filter(field => Array.isArray(field.options))
+  .map(field => ({
+    key: field.key,
+    type: field.type,
+    allowedOptions: new Set(field.options)
+  }));
 
-function createImageSafeAnswers(answers = {}) {
-  const safeAnswers = structuredClone(answers || {});
+export function createImageSafeAnswers(answers = {}) {
+  const sourceAnswers = structuredClone(answers || {});
+  const safeAnswers = {};
+
+  for (const field of IMAGE_CHOICE_FIELDS) {
+    const value = sourceAnswers[field.key];
+    if (field.type === "multi") {
+      safeAnswers[field.key] = Array.isArray(value)
+        ? value.filter(option => field.allowedOptions.has(option))
+        : [];
+    } else {
+      safeAnswers[field.key] = field.allowedOptions.has(value) ? value : "";
+    }
+  }
   for (const key of IMAGE_PRIVATE_KEYS) safeAnswers[key] = "";
+  if (!needsThirdRoomUse(safeAnswers)) safeAnswers.thirdRoomUse = "";
   return safeAnswers;
 }
 

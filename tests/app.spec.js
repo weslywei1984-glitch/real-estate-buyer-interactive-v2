@@ -726,13 +726,26 @@ test("儲存需求照片 downloads the same public card after confirmed contact"
   await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
 });
 
-test("儲存需求照片 keeps a real long-text canvas downloadable with a safe footer", async ({ page }) => {
+test("儲存需求照片 keeps a polluted long-text canvas downloadable with a safe footer", async ({ page }) => {
   await page.goto("/?testStep=result");
   const canvasMetrics = await page.evaluate(async () => {
     const repeated = "超長自訂生活圈與通勤需求".repeat(60);
     Object.assign(window.__buyerAppTest.state.answers, {
-      areas: [],
+      purpose: "private.line.id",
+      timeline: "0911222333",
+      areas: ["buyer@example.com", "永康區"],
       customArea: `${repeated} 0911222333 private.line.id`,
+      lifeFocus: ["王小明", "工作通勤"],
+      downPayment: "secret_line",
+      monthlyMortgage: "0987654321",
+      householdSize: "private-household",
+      rooms: "private-rooms",
+      thirdRoomUse: "private-third-room",
+      propertyTypes: ["private-phone-0911222333", "電梯大樓"],
+      agePreference: "tainan.wei_88",
+      parking: "0911-222-333",
+      mustHaves: ["private-priority", "格局"],
+      noGos: ["private-no-go", "頂樓"],
       moveInBudget: `希望保留生活餘裕並逐項估算${repeated} buyer@example.com`
     });
     window.__buyerAppTest.render({ focus: false });
@@ -769,9 +782,27 @@ test("儲存需求照片 keeps a real long-text canvas downloadable with a safe 
     blobSize: expect.any(Number)
   });
   expect(canvasMetrics.blobSize).toBeGreaterThan(10_000);
-  expect(canvasMetrics.drawnText).not.toContain("0911222333");
-  expect(canvasMetrics.drawnText).not.toContain("private.line.id");
-  expect(canvasMetrics.drawnText).not.toContain("buyer@example.com");
+  for (const privateValue of [
+    "private.line.id",
+    "0911222333",
+    "buyer@example.com",
+    "王小明",
+    "secret_line",
+    "0987654321",
+    "private-household",
+    "private-rooms",
+    "private-third-room",
+    "private-phone-0911222333",
+    "tainan.wei_88",
+    "0911-222-333",
+    "private-priority",
+    "private-no-go"
+  ]) {
+    expect(canvasMetrics.drawnText).not.toContain(privateValue);
+  }
+  for (const legalValue of ["永康區", "工作通勤", "電梯大樓", "格局"]) {
+    expect(canvasMetrics.drawnText).toContain(legalValue);
+  }
 
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "儲存需求照片" }).click();

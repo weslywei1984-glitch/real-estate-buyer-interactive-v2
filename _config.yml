@@ -1,0 +1,13 @@
+exclude:
+  - .superpowers/
+  - apps-script/
+  - docs/
+  - node_modules/
+  - output/
+  - test-results/
+  - tests/
+  - .gitignore
+  - package-lock.json
+  - package.json
+  - playwright.config.js
+  - README.md

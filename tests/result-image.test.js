@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { downloadResultImage, renderResultImage } from "../src/result-image.js";
+import * as resultImage from "../src/result-image.js";
 import { deriveResult } from "../src/result.js";
+
+const { downloadResultImage, renderResultImage } = resultImage;
 
 function createFakeCanvas({ blob = new Blob(["png"], { type: "image/png" }) } = {}) {
   const drawn = [];
@@ -92,6 +94,149 @@ function publicAnswers() {
     consent: false
   };
 }
+
+test("image-safe answers allow only schema choices without mutating the caller", () => {
+  assert.equal(typeof resultImage.createImageSafeAnswers, "function");
+
+  const pollutedAnswers = {
+    ...publicAnswers(),
+    purpose: "private.line.id",
+    timeline: "0911222333",
+    areas: ["buyer@example.com", "永康區"],
+    lifeFocus: ["王小明", "工作通勤"],
+    downPayment: "secret_line",
+    monthlyMortgage: "0987654321",
+    householdSize: "private-household",
+    rooms: "private-rooms",
+    thirdRoomUse: "private-third-room",
+    propertyTypes: ["private-phone-0911222333", "電梯大樓"],
+    agePreference: "tainan.wei_88",
+    parking: "0911-222-333",
+    mustHaves: ["private-priority", "格局"],
+    noGos: ["private-no-go", "頂樓"]
+  };
+  const originalSnapshot = structuredClone(pollutedAnswers);
+  const safePollutedAnswers = resultImage.createImageSafeAnswers(pollutedAnswers);
+
+  assert.deepEqual(
+    {
+      purpose: safePollutedAnswers.purpose,
+      timeline: safePollutedAnswers.timeline,
+      areas: safePollutedAnswers.areas,
+      lifeFocus: safePollutedAnswers.lifeFocus,
+      downPayment: safePollutedAnswers.downPayment,
+      monthlyMortgage: safePollutedAnswers.monthlyMortgage,
+      householdSize: safePollutedAnswers.householdSize,
+      rooms: safePollutedAnswers.rooms,
+      thirdRoomUse: safePollutedAnswers.thirdRoomUse,
+      propertyTypes: safePollutedAnswers.propertyTypes,
+      agePreference: safePollutedAnswers.agePreference,
+      parking: safePollutedAnswers.parking,
+      mustHaves: safePollutedAnswers.mustHaves,
+      noGos: safePollutedAnswers.noGos
+    },
+    {
+      purpose: "",
+      timeline: "",
+      areas: ["永康區"],
+      lifeFocus: ["工作通勤"],
+      downPayment: "",
+      monthlyMortgage: "",
+      householdSize: "",
+      rooms: "",
+      thirdRoomUse: "",
+      propertyTypes: ["電梯大樓"],
+      agePreference: "",
+      parking: "",
+      mustHaves: ["格局"],
+      noGos: ["頂樓"]
+    }
+  );
+  assert.deepEqual(pollutedAnswers, originalSnapshot);
+
+  const legalAnswers = {
+    ...publicAnswers(),
+    areas: ["東區", "永康區"],
+    lifeFocus: ["工作通勤", "日常採買"],
+    rooms: "3房",
+    thirdRoomUse: "工作／書房",
+    propertyTypes: ["電梯大樓", "透天"],
+    mustHaves: ["格局", "採光通風"],
+    noGos: ["頂樓"]
+  };
+  const safeLegalAnswers = resultImage.createImageSafeAnswers(legalAnswers);
+
+  for (const key of [
+    "purpose",
+    "timeline",
+    "areas",
+    "lifeFocus",
+    "downPayment",
+    "monthlyMortgage",
+    "householdSize",
+    "rooms",
+    "thirdRoomUse",
+    "propertyTypes",
+    "agePreference",
+    "parking",
+    "mustHaves",
+    "noGos"
+  ]) {
+    assert.deepEqual(safeLegalAnswers[key], legalAnswers[key], `legal ${key} must be preserved`);
+  }
+});
+
+test("result image never draws polluted fixed-choice values", () => {
+  const canvas = createFakeCanvas();
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => canvas };
+  const pollutedAnswers = {
+    ...publicAnswers(),
+    purpose: "private.line.id",
+    timeline: "0911222333",
+    areas: ["buyer@example.com", "永康區"],
+    lifeFocus: ["王小明", "工作通勤"],
+    downPayment: "secret_line",
+    monthlyMortgage: "0987654321",
+    householdSize: "private-household",
+    rooms: "private-rooms",
+    thirdRoomUse: "private-third-room",
+    propertyTypes: ["private-phone-0911222333", "電梯大樓"],
+    agePreference: "tainan.wei_88",
+    parking: "0911-222-333",
+    mustHaves: ["private-priority", "格局"],
+    noGos: ["private-no-go", "頂樓"]
+  };
+
+  try {
+    renderResultImage({ answers: pollutedAnswers });
+    const text = canvas.context.drawn.map(entry => entry.value).join("");
+
+    for (const privateValue of [
+      "private.line.id",
+      "0911222333",
+      "buyer@example.com",
+      "王小明",
+      "secret_line",
+      "0987654321",
+      "private-household",
+      "private-rooms",
+      "private-third-room",
+      "private-phone-0911222333",
+      "tainan.wei_88",
+      "0911-222-333",
+      "private-priority",
+      "private-no-go"
+    ]) {
+      assert.doesNotMatch(text, new RegExp(privateValue.replaceAll(".", "\\.")));
+    }
+    for (const legalValue of ["永康區", "工作通勤", "電梯大樓", "格局"]) {
+      assert.match(text, new RegExp(legalValue));
+    }
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
 
 test("result image renders the public diagnosis at 1080 by 1350 without buyer contact data", () => {
   const canvas = createFakeCanvas();
