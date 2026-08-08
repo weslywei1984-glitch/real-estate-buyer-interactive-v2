@@ -680,6 +680,14 @@ test("LINE contact uses the approved add-friend link", async ({ page }) => {
 });
 
 test("儲存需求照片 downloads the public result card before contact", async ({ page }) => {
+  await page.addInitScript(() => {
+    const revokeObjectURL = URL.revokeObjectURL.bind(URL);
+    window.__revokedResultImageUrls = [];
+    URL.revokeObjectURL = objectUrl => {
+      window.__revokedResultImageUrls.push(objectUrl);
+      return revokeObjectURL(objectUrl);
+    };
+  });
   await page.goto("/?testStep=result");
   const downloadEvent = page.waitForEvent("download");
 
@@ -695,6 +703,7 @@ test("儲存需求照片 downloads the public result card before contact", async
     .join("");
   expect(download.suggestedFilename()).toBe(`台南小魏-買房方向卡-${date}.png`);
   expectResultPng(await readDownloadBytes(download));
+  await expect.poll(() => page.evaluate(() => window.__revokedResultImageUrls.length)).toBe(1);
   await expect(page.locator("#toast")).toHaveText("需求照片已儲存");
 });
 

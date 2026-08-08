@@ -301,9 +301,7 @@ async function saveResultImage() {
   const snapshot = state.phase === "complete" ? state.confirmedSubmission : currentActiveSubmission();
   try {
     await downloadResultImage({
-      result: snapshot?.result || deriveResult(state.answers),
       answers: snapshot?.answers || state.answers,
-      phone: PHONE,
       documentRef: document,
       urlRef: URL
     });

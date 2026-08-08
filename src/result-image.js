@@ -1,3 +1,5 @@
+import { deriveResult } from "./result.js";
+
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
 const INK = "#18352e";
@@ -8,15 +10,29 @@ const PAPER = "#fffdf8";
 const PAPER_WARM = "#f7f1e6";
 const BODY_FONT = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
 const DISPLAY_FONT = '"Noto Serif TC", "Songti TC", "PMingLiU", "Microsoft JhengHei", serif';
-const CONTACT_REDACTION = "[聯絡資訊已隱藏]";
+const BRAND_PHONE = "0927-617-207";
+const IMAGE_PRIVATE_KEYS = [
+  "name",
+  "phone",
+  "customArea",
+  "customDownPayment",
+  "customMonthlyMortgage",
+  "customRooms",
+  "customAgePreference",
+  "otherNoGo",
+  "moveInBudget",
+  "conditionTolerance",
+  "decisionLimit"
+];
 
-function redactContactDetails(value) {
-  return String(value || "")
-    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, CONTACT_REDACTION)
-    .replace(/(^|\D)(09(?:[\s.\-–—]?\d){8})(?!\d)/gu, (_, prefix) => `${prefix}${CONTACT_REDACTION}`)
-    .replace(/[A-Za-z0-9._-]+/g, token => (
-      /[A-Za-z]/.test(token) ? CONTACT_REDACTION : token
-    ));
+function createImageSafeAnswers(answers = {}) {
+  const safeAnswers = structuredClone(answers || {});
+  for (const key of IMAGE_PRIVATE_KEYS) safeAnswers[key] = "";
+  return safeAnswers;
+}
+
+function deriveImageResult(answers) {
+  return deriveResult(createImageSafeAnswers(answers));
 }
 
 function setFont(context, size, weight = 500, family = BODY_FONT) {
@@ -72,7 +88,7 @@ function wrappedLines(context, value, maxWidth, maxLines) {
 }
 
 function drawWrappedText(context, value, { x, y, maxWidth, maxLines, lineHeight }) {
-  const lines = wrappedLines(context, redactContactDetails(value), maxWidth, maxLines);
+  const lines = wrappedLines(context, value, maxWidth, maxLines);
   lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
   return y + lines.length * lineHeight;
 }
@@ -94,7 +110,7 @@ function drawSectionLabel(context, value, y) {
   context.fillText(value, 112, y);
 }
 
-function drawCard({ result, phone, documentRef }) {
+function drawCard({ result, documentRef }) {
   const canvas = documentRef.createElement("canvas");
   canvas.width = CARD_WIDTH;
   canvas.height = CARD_HEIGHT;
@@ -122,10 +138,10 @@ function drawCard({ result, phone, documentRef }) {
   context.textAlign = "right";
   context.fillStyle = INK_SOFT;
   setFont(context, 24, 700);
-  context.fillText(phone || "0927-617-207", 972, 94);
+  context.fillText(BRAND_PHONE, 972, 94);
   context.textAlign = "start";
 
-  const status = redactContactDetails(result?.status || "方向整理完成");
+  const status = String(result?.status || "方向整理完成");
   setFont(context, 22, 800);
   const statusWidth = Math.min(context.measureText(status).width + 48, 360);
   context.fillStyle = GOLD_PALE;
@@ -205,7 +221,7 @@ function drawCard({ result, phone, documentRef }) {
   context.fillText("魏泉承｜永慶不動產-小東南紡店", 112, 1257);
   context.textAlign = "right";
   setFont(context, 22, 800);
-  context.fillText(phone || "0927-617-207", 968, 1255);
+  context.fillText(BRAND_PHONE, 968, 1255);
   context.textAlign = "start";
 
   return canvas;
@@ -226,14 +242,16 @@ function toPngBlob(canvas) {
   });
 }
 
-export function renderResultImage({ result, phone }) {
+export function renderResultImage({ answers }) {
   if (!globalThis.document) throw new Error("無法建立需求照片");
-  return drawCard({ result, phone, documentRef: globalThis.document });
+  const result = deriveImageResult(answers);
+  return drawCard({ result, documentRef: globalThis.document });
 }
 
-export async function downloadResultImage({ result, phone, documentRef = globalThis.document, urlRef = globalThis.URL }) {
+export async function downloadResultImage({ answers, documentRef = globalThis.document, urlRef = globalThis.URL }) {
   if (!documentRef || !urlRef) throw new Error("無法建立需求照片");
-  const canvas = drawCard({ result, phone, documentRef });
+  const result = deriveImageResult(answers);
+  const canvas = drawCard({ result, documentRef });
   const blob = await toPngBlob(canvas);
   const filename = `台南小魏-買房方向卡-${dateStamp()}.png`;
   const objectUrl = urlRef.createObjectURL(blob);

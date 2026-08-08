@@ -62,6 +62,37 @@ function publicResult() {
   };
 }
 
+function publicAnswers() {
+  return {
+    purpose: "自住",
+    timeline: "3個月內",
+    areas: ["永康區"],
+    customArea: "",
+    lifeFocus: ["工作通勤"],
+    downPayment: "200～300萬",
+    customDownPayment: "",
+    monthlyMortgage: "2～3萬",
+    customMonthlyMortgage: "",
+    householdSize: "2 人",
+    rooms: "2房",
+    customRooms: "",
+    thirdRoomUse: "",
+    propertyTypes: ["電梯大樓"],
+    agePreference: "20年內",
+    customAgePreference: "",
+    parking: "一定要平車",
+    mustHaves: ["格局"],
+    noGos: [],
+    otherNoGo: "",
+    moveInBudget: "",
+    conditionTolerance: "",
+    decisionLimit: "",
+    name: "",
+    phone: "",
+    consent: false
+  };
+}
+
 test("result image renders the public diagnosis at 1080 by 1350 without buyer contact data", () => {
   const canvas = createFakeCanvas();
   const previousDocument = globalThis.document;
@@ -71,6 +102,7 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
     const rendered = renderResultImage({
       result: publicResult(),
       answers: {
+        ...publicAnswers(),
         name: "測試買方林小姐",
         phone: "0911222333",
         lineId: "private.line.id"
@@ -89,9 +121,9 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
       "先把生活與負擔對齊；",
       "這次以自住為主",
       "目前以自備款",
-      "總預算與可負擔範圍",
-      "格局仍符合每天的使用方式",
-      "通勤與生活圈實際走過了嗎",
+      "室外環境、通勤與生活圈實際走過了嗎",
+      "第一眼心動後，價格與必要條件也確認了嗎",
+      "拿掉裝潢加分後，格局仍符合每天的使用方式嗎",
       "0927-617-207"
     ]) {
       assert.match(text, new RegExp(expected));
@@ -104,7 +136,91 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
   }
 });
 
-test("result image redacts contact-shaped free text that entered through diagnosis answers", () => {
+test("result image derives only from image-safe answers and ignores malicious result strings", () => {
+  const canvas = createFakeCanvas();
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => canvas };
+  const privateValues = [
+    "中文姓名甲",
+    "王小明",
+    "陳小姐",
+    "林先生",
+    "黃小姐",
+    "張先生",
+    "李小姐",
+    "蔡小姐",
+    "吳先生",
+    "許小姐",
+    "惡意狀態周小姐",
+    "惡意標題周小姐",
+    "惡意方向周小姐",
+    "惡意預算周小姐",
+    "惡意優先周小姐"
+  ];
+  const answers = {
+    ...publicAnswers(),
+    downPayment: "自訂金額",
+    monthlyMortgage: "自訂",
+    rooms: "自訂",
+    agePreference: "自訂",
+    noGos: ["其他"],
+    name: "中文姓名甲",
+    phone: "0911222333",
+    customArea: "王小明",
+    customDownPayment: "陳小姐",
+    customMonthlyMortgage: "林先生",
+    customRooms: "黃小姐",
+    customAgePreference: "張先生",
+    otherNoGo: "李小姐",
+    moveInBudget: "蔡小姐",
+    conditionTolerance: "吳先生",
+    decisionLimit: "許小姐"
+  };
+  const maliciousResult = {
+    status: "惡意狀態周小姐",
+    headline: "惡意標題周小姐",
+    direction: ["惡意方向周小姐"],
+    budgetReminder: "惡意預算周小姐",
+    priorityPreview: [
+      { text: "惡意優先周小姐" },
+      { text: "惡意優先周小姐" },
+      { text: "惡意優先周小姐" }
+    ]
+  };
+
+  try {
+    renderResultImage({ result: maliciousResult, answers, phone: "0911222333" });
+    const text = canvas.context.drawn.map(entry => entry.value).join("");
+
+    for (const privateValue of [...privateValues, "0911222333"]) {
+      assert.doesNotMatch(text, new RegExp(privateValue));
+    }
+    assert.match(text, /永康區/);
+    assert.match(text, /自訂金額/);
+    assert.match(text, /0927-617-207/);
+    assert.equal(answers.customArea, "王小明");
+    assert.equal(answers.name, "中文姓名甲");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("result image never lets a caller override the brand phone", () => {
+  const canvas = createFakeCanvas();
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => canvas };
+
+  try {
+    renderResultImage({ answers: publicAnswers(), phone: "0911222333" });
+    const text = canvas.context.drawn.map(entry => entry.value).join("");
+    assert.doesNotMatch(text, /0911222333/);
+    assert.match(text, /0927-617-207/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("result image excludes contact-shaped free text that entered through diagnosis answers", () => {
   const canvas = createFakeCanvas();
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: () => canvas };
@@ -155,7 +271,6 @@ test("result image redacts contact-shaped free text that entered through diagnos
     }
     assert.match(text, /這次以自住為主/);
     assert.match(text, /預算提醒/);
-    assert.match(text, /聯絡資訊已隱藏/);
     assert.match(text, /0927-617-207/);
   } finally {
     globalThis.document = previousDocument;
