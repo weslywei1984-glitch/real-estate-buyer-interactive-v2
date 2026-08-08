@@ -94,7 +94,7 @@ test("completes the six-screen path and reveals the result/contact page", async 
   await expect(page.getByRole("heading", { name: "每天的生活，主要會落在哪裡？" })).toBeFocused();
 
   await completeQuestionnaire(page);
-  await expect(page.getByRole("heading", { name: /條件整理中/ })).toBeVisible();
+  await expect(page.locator(".result-status")).toHaveText("條件整理中");
   await expect(page.getByRole("heading", { name: "免費取得完整看屋方向卡" })).toBeVisible();
   await expect(page.getByRole("button", { name: "免費取得完整方向卡" })).toBeVisible();
 });
@@ -375,9 +375,12 @@ test("reduced motion reveals confirmed content without stagger delay", async ({ 
   expect(children.every(({ opacity }) => opacity === "1")).toBe(true);
 });
 
-test("the confirmed page offers a one-tap call and the result page does not", async ({ page }) => {
+test("call action is available before and after confirmation", async ({ page }) => {
   await page.goto("/?testStep=result");
-  await expect(page.getByRole("link", { name: /直接撥打/ })).toHaveCount(0);
+  const resultCall = page.getByRole("link", { name: /直接撥打/ });
+  await expect(resultCall).toBeVisible();
+  await expect(resultCall).toHaveAttribute("href", "tel:0927617207");
+  await expect(resultCall).toContainText("0927-617-207");
 
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
@@ -676,7 +679,7 @@ test("focus indicator has at least 3 to 1 contrast on both card backgrounds", as
   expect(contrastRatio(outlineColor, "rgb(247, 241, 230)")).toBeGreaterThanOrEqual(3);
 });
 
-test("copies the demand summary and exposes the real LINE contact", async ({ page }) => {
+test("LINE contact uses the approved add-friend link and copies the demand summary", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -684,11 +687,8 @@ test("copies the demand summary and exposes the real LINE contact", async ({ pag
     });
   });
   await page.goto("/?testStep=result");
-  // oaMessage 直接開對話框；加好友落地頁在電腦上會顯示 QR Code。
   const lineHref = await page.getByRole("link", { name: "改用 LINE 聯絡" }).getAttribute("href");
-  expect(lineHref).toContain("https://line.me/R/oaMessage/%40tainanwei/");
-  expect(lineHref).not.toContain("/ti/p/");
-  expect(decodeURIComponent(lineHref)).toContain("買房方向診斷");
+  expect(lineHref).toBe("https://line.me/R/ti/p/%40tainanwei");
   await page.getByRole("button", { name: "複製需求摘要" }).click();
   await expect(page.locator("#toast")).toHaveText("需求摘要已複製");
   await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain("台南小魏 買厝作伙");
@@ -738,6 +738,51 @@ test("mobile optional no-go choices keep long labels in one readable column", as
     expect(metrics.height).toBeGreaterThanOrEqual(52);
     expect(metrics.fullyReadable).toBe(true);
   }
+});
+
+test("result refinement renders fixed headline lines and the approved status scale", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?testStep=result");
+
+  await expect(page.locator(".result-headline-line")).toHaveText([
+    "先把生活與負擔對齊；",
+    "再挑真正值得看的房子。"
+  ]);
+  await expect(page.locator(".result-status")).toHaveCSS("font-size", "19.5px");
+});
+
+test("contact fields stay aligned on desktop and stack without mobile overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?testStep=result");
+
+  await expect(page.getByLabel("怎麼稱呼您？")).toHaveCount(1);
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toHaveCount(1);
+  await expect(page.getByText("手機輸入10碼，例09XX；LINE ID 可直接輸入")).toBeVisible();
+
+  const desktop = await page.evaluate(() => {
+    const name = document.querySelector("#name").getBoundingClientRect();
+    const phone = document.querySelector("#phone").getBoundingClientRect();
+    return { name, phone };
+  });
+  expect(Math.abs(desktop.name.top - desktop.phone.top)).toBeLessThanOrEqual(1);
+  expect(Math.abs(desktop.name.height - desktop.phone.height)).toBeLessThanOrEqual(1);
+  expect(Math.abs(desktop.name.width - desktop.phone.width)).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  const mobile = await page.evaluate(() => {
+    const name = document.querySelector("#name").getBoundingClientRect();
+    const phone = document.querySelector("#phone").getBoundingClientRect();
+    const root = document.documentElement;
+    return {
+      name,
+      phone,
+      scrollWidth: root.scrollWidth,
+      clientWidth: root.clientWidth
+    };
+  });
+  expect(mobile.phone.top).toBeGreaterThanOrEqual(mobile.name.bottom);
+  expect(Math.abs(mobile.name.width - mobile.phone.width)).toBeLessThanOrEqual(1);
+  expect(mobile.scrollWidth).toBeLessThanOrEqual(mobile.clientWidth);
 });
 
 test("reduced motion keeps the question readable without visible transitions", async ({ page }) => {

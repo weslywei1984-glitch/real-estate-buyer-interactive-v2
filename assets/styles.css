@@ -646,15 +646,19 @@ legend,
 .result-status {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
+  min-height: 42px;
   margin-bottom: 18px;
-  padding: 5px 10px;
+  padding: 7px 14px;
   color: var(--ink);
   border: 1px solid rgba(200, 148, 63, 0.45);
   border-radius: 999px;
   background: #fff5df;
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 800;
+}
+
+.result-headline-line {
+  display: block;
 }
 
 .preview-priorities {
@@ -684,12 +688,18 @@ legend,
 
 .contact-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .contact-grid .field {
   margin-top: 0;
+  grid-template-rows: 24px 50px 20px;
+}
+
+.contact-grid .field input {
+  min-height: 0;
+  height: 50px;
 }
 
 .consent {
@@ -993,6 +1003,14 @@ legend,
   .choice-grid,
   .contact-grid {
     grid-template-columns: 1fr;
+  }
+
+  .contact-grid .field {
+    grid-template-rows: auto 50px auto;
+  }
+
+  .contact-grid .name-guidance {
+    display: none;
   }
 
   .choice-grid.compact {

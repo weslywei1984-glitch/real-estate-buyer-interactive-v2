@@ -464,9 +464,10 @@ function renderQuestion({ focus = true } = {}) {
 }
 
 function resultPreview(result) {
+  const headlineLines = result.headline.split("\n");
   return `<article class="result-card">
     <span class="result-status">${escapeHtml(result.status)}</span>
-    <h2 tabindex="-1">${escapeHtml(result.headline)}</h2>
+    <h2 tabindex="-1">${headlineLines.map(line => `<span class="result-headline-line">${escapeHtml(line)}</span>`).join("")}</h2>
     <h3>目前找房方向</h3>
     <ul class="direction-list">${result.direction.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
     <h3>預算提醒</h3>
@@ -542,7 +543,7 @@ function renderResult({ focus = true } = {}) {
       <h3>免費取得完整看屋方向卡</h3>
       <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
       <div class="contact-grid">
-        <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}></label>
+        <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}><span class="field-guidance name-guidance" aria-hidden="true"></span></label>
         <label class="field" for="phone"><span>手機號碼 or LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
       </div>
       <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}${locked}><span>我同意由小魏依這份結果與我聯繫</span></label>
@@ -554,6 +555,7 @@ function renderResult({ focus = true } = {}) {
       <div class="fallback-actions">
         <button id="resultBack" type="button"${locked}>回上一步</button>
         <button id="copyButton" type="button">複製需求摘要</button>
+        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
         <a href="${LINE_URL}" target="_blank" rel="noopener">改用 LINE 聯絡</a>
       </div>
     </form>`;

@@ -133,7 +133,7 @@ export function deriveResult(answers) {
     : "房價之外，再預留入住整理與修繕空間。";
   return {
     status,
-    headline: `${status}｜先把生活與負擔對齊，再挑真正值得看的房子`,
+    headline: "先把生活與負擔對齊；\n再挑真正值得看的房子。",
     direction,
     budgetReminder: `目前以自備款「${downPayment || "待確認"}」與舒服月付「${monthlyMortgage || "待確認"}」整理方向；${budgetDetail}另外保留生活餘裕，並把修繕、管理費與持有成本一起算。實際貸款仍以銀行審核與個人條件為準。`,
     strategy,

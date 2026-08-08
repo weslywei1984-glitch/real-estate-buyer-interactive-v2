@@ -16,6 +16,12 @@ function completeAnswers() {
   return structuredClone(complete);
 }
 
+test("separates the buyer result headline into the approved two lines", () => {
+  const result = deriveResult(completeAnswers());
+
+  assert.equal(result.headline, "先把生活與負擔對齊；\n再挑真正值得看的房子。");
+});
+
 test("always exposes all ten video-derived questions", () => {
   assert.equal(VIDEO_QUESTIONS.length, 10);
   assert.deepEqual(VIDEO_QUESTIONS.map(item => item.ep), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
