@@ -1,7 +1,7 @@
 const SHEET_NAME = "C版買方診斷名單";
 const SOURCE_VERSION = "buyer-diagnosis-c-v2";
 const HEADERS = [
-  "建立時間", "提交識別碼", "來源版本", "稱呼", "手機號碼", "購屋目的", "購屋時程",
+  "建立時間", "提交識別碼", "來源版本", "稱呼", "手機／LINE ID", "購屋目的", "購屋時程",
   "想找區域", "生活重心", "自備款區間", "舒服月付區間", "居住人數", "希望房數",
   "第三房用途", "物件類型", "屋齡接受度", "車位需求", "最重視條件", "一定避開條件",
   "其他避開說明", "買方狀態", "找房方向摘要", "預算提醒", "看屋策略", "同意聯繫",
@@ -19,7 +19,7 @@ function doPost(e) {
     ensureHeaders_(sheet);
     if (!findSubmission_(sheet, data.submissionId)) {
       sheet.appendRow([
-        new Date(), safe_(data.submissionId), safe_(data.sourceVersion), safe_(data.name), phone_(data.phone),
+        new Date(), safe_(data.submissionId), safe_(data.sourceVersion), safe_(data.name), contact_(data.phone),
         safe_(data.purpose), safe_(data.timeline), list_(data.areas), safe_(data.lifeFocus),
         safe_(data.downPayment), safe_(data.monthlyMortgage), safe_(data.householdSize), safe_(data.rooms),
         safe_(data.thirdRoomUse), list_(data.propertyTypes), safe_(data.agePreference), safe_(data.parking),
@@ -52,7 +52,7 @@ function doGet(e) {
 function validate_(data) {
   if (data.sourceVersion !== SOURCE_VERSION) throw new Error("invalid source version");
   if (!/^[0-9a-f-]{16,64}$/i.test(String(data.submissionId || ""))) throw new Error("invalid submission id");
-  if (!/^09\d{8}$/.test(String(data.phone || ""))) throw new Error("invalid phone");
+  if (!validContact_(data.phone)) throw new Error("invalid contact");
   if (!String(data.name || "").trim()) throw new Error("name required");
   if (data.consent !== true) throw new Error("consent required");
 }
@@ -100,8 +100,29 @@ function safe_(value) {
   return /^[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
-function phone_(value) {
-  const text = String(value || "").trim();
+function mobileDigits_(value) {
+  return String(value || "").trim().replace(/[\s-]/g, "");
+}
+
+function isTaiwanMobile_(value) {
+  return /^09\d{8}$/.test(mobileDigits_(value));
+}
+
+function isLineId_(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return /^(?!\d+$)[a-z0-9._-]+$/.test(text);
+}
+
+function validContact_(value) {
+  return isTaiwanMobile_(value) || isLineId_(value);
+}
+
+function normalizeContact_(value) {
+  return isTaiwanMobile_(value) ? mobileDigits_(value) : String(value || "").trim().toLowerCase();
+}
+
+function contact_(value) {
+  const text = normalizeContact_(value);
   return text ? `'${text}` : "";
 }
 

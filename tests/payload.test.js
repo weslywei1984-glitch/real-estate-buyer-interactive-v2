@@ -2,10 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPayload,
-  buildSummary,
-  isTaiwanMobile,
-  normalizePhone
+  buildSummary
 } from "../src/payload.js";
+import {
+  isLineId,
+  isTaiwanMobile,
+  isValidContact,
+  normalizeContact
+} from "../src/contact.js";
 
 const answers = {
   name: "  王小明  ",
@@ -40,10 +44,17 @@ const result = {
   videoQuestions: []
 };
 
-test("normalizes a Taiwan mobile number", () => {
-  assert.equal(normalizePhone("0912-345-678"), "0912345678");
+test("normalizes and validates phone numbers or LINE IDs", () => {
+  assert.equal(normalizeContact("0912-345-678"), "0912345678");
+  assert.equal(normalizeContact("Tainan.Wei_88"), "tainan.wei_88");
   assert.equal(isTaiwanMobile("0912 345 678"), true);
   assert.equal(isTaiwanMobile("0212345678"), false);
+  assert.equal(isLineId("tainan.wei_88"), true);
+  assert.equal(isLineId("0912345678"), false);
+  assert.equal(isValidContact("0912 345 678"), true);
+  assert.equal(isValidContact("tainan.wei_88"), true);
+  assert.equal(isValidContact("0912"), false);
+  assert.equal(isValidContact("bad id"), false);
 });
 
 test("builds the versioned backend contract", () => {
@@ -66,6 +77,16 @@ test("builds the versioned backend contract", () => {
   assert.equal(payload.decisionLimit, "");
   assert.equal("ip" in payload, false);
   assert.equal("fingerprint" in payload, false);
+});
+
+test("builds the existing phone payload field from a normalized LINE ID", () => {
+  const payload = buildPayload({
+    answers: { ...answers, phone: "Tainan.Wei_88" },
+    result,
+    submissionId: "sub-123"
+  });
+
+  assert.equal(payload.phone, "tainan.wei_88");
 });
 
 test("builds a readable summary from buyer answers and diagnosis", () => {

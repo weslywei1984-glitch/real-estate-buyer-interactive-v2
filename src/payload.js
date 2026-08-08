@@ -1,15 +1,8 @@
 import { resolveAnswer } from "./questions.js";
+import { normalizeContact } from "./contact.js";
 
 function listOf(value) {
   return Array.isArray(value) ? value : [value].filter(Boolean);
-}
-
-export function normalizePhone(value = "") {
-  return String(value).replace(/\D/g, "").slice(0, 10);
-}
-
-export function isTaiwanMobile(value) {
-  return /^09\d{8}$/.test(normalizePhone(value));
 }
 
 export function buildPayload({ answers, result, submissionId, submittedAt = new Date().toISOString() }) {
@@ -18,7 +11,7 @@ export function buildPayload({ answers, result, submissionId, submittedAt = new 
     submittedAt,
     sourceVersion: "buyer-diagnosis-c-v2",
     name: answers.name?.trim() || "",
-    phone: normalizePhone(answers.phone),
+    phone: normalizeContact(answers.phone),
     purpose: answers.purpose || "",
     timeline: answers.timeline || "",
     areas: [...(answers.areas || []), answers.customArea].filter(Boolean),

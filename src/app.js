@@ -7,7 +7,8 @@ import {
   validateStep
 } from "./questions.js";
 import { deriveResult } from "./result.js";
-import { buildPayload, buildSummary, isTaiwanMobile } from "./payload.js";
+import { buildPayload, buildSummary } from "./payload.js";
+import { isValidContact, normalizeContact } from "./contact.js";
 import { submitLead } from "./api.js";
 import { randomId } from "./random.js";
 import { BACKEND_URL, LINE_URL, PHONE } from "./config.js";
@@ -246,8 +247,8 @@ async function handleSubmit() {
     reportSubmitBlocked("還差一步：請填寫怎麼稱呼您。", "name");
     return;
   }
-  if (!isTaiwanMobile(state.answers.phone)) {
-    reportSubmitBlocked("還差一步：請填寫 09 開頭的 10 碼手機號碼。", "phone");
+  if (!isValidContact(state.answers.phone)) {
+    reportSubmitBlocked("還差一步：請輸入 09 開頭的 10 碼手機號碼或合法 LINE ID。", "phone");
     return;
   }
   if (!state.answers.consent) {
@@ -489,6 +490,8 @@ function bindContactEvents() {
   });
   $("phone").addEventListener("blur", () => {
     if (state.submitting) return;
+    state.answers.phone = normalizeContact(state.answers.phone);
+    $("phone").value = state.answers.phone;
     state.phoneTouched = true;
     updateSubmitState();
   });
@@ -506,15 +509,15 @@ function bindContactEvents() {
 }
 
 function updateSubmitState() {
-  const phoneValid = isTaiwanMobile(state.answers.phone);
+  const phoneValid = isValidContact(state.answers.phone);
   const phone = $("phone");
   const guidance = $("phoneGuidance");
   const showPhoneError = state.phoneTouched && !phoneValid;
 
   phone.setAttribute("aria-invalid", String(showPhoneError));
   guidance.textContent = showPhoneError
-    ? "請輸入 09 開頭的 10 碼手機號碼"
-    : "可輸入 0912-345-678，送出時會整理為 10 碼數字。";
+    ? "請輸入 09 開頭的 10 碼手機號碼或合法 LINE ID"
+    : "手機輸入10碼，例09XX；LINE ID 可直接輸入";
   guidance.classList.toggle("error", showPhoneError);
   // 按鈕只在送出中鎖住。缺欄位時仍可按，由 handleSubmit 指出還差什麼，
   // 避免使用者按了完全沒反應。
@@ -540,7 +543,7 @@ function renderResult({ focus = true } = {}) {
       <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可複製摘要或改用 LINE。</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}></label>
-        <label class="field" for="phone"><span>手機號碼</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
+        <label class="field" for="phone"><span>手機號碼 or LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
       </div>
       <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}${locked}><span>我同意由小魏依這份結果與我聯繫</span></label>
       <div class="form-error" id="submitError" role="alert" tabindex="-1">${escapeHtml(state.submitError)}</div>

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const EXPECTED_HEADERS = [
-  "建立時間", "提交識別碼", "來源版本", "稱呼", "手機號碼", "購屋目的", "購屋時程",
+  "建立時間", "提交識別碼", "來源版本", "稱呼", "手機／LINE ID", "購屋目的", "購屋時程",
   "想找區域", "生活重心", "自備款區間", "舒服月付區間", "居住人數", "希望房數",
   "第三房用途", "物件類型", "屋齡接受度", "車位需求", "最重視條件", "一定避開條件",
   "其他避開說明", "買方狀態", "找房方向摘要", "預算提醒", "看屋策略", "同意聯繫",
@@ -212,11 +212,13 @@ test("configureBoundSheet freezes an imported sheet whose exact headers already 
   assert.deepEqual(sheet.rows[0], EXPECTED_HEADERS);
 });
 
-test("doPost validates version, submission id, phone, name, and consent", () => {
+test("doPost validates version, submission id, contact, name, and consent", () => {
   const invalidCases = [
     ["wrong-version", { sourceVersion: "old" }, "invalid source version"],
     ["bad-id", { submissionId: "short" }, "invalid submission id"],
-    ["bad-phone", { phone: "0212345678" }, "invalid phone"],
+    ["bad-phone", { phone: "0212345678" }, "invalid contact"],
+    ["space-in-line-id", { phone: "tainan wei" }, "invalid contact"],
+    ["unsupported-line-id-symbol", { phone: "tainan/wei" }, "invalid contact"],
     ["missing-name", { name: "   " }, "name required"],
     ["no-consent", { consent: false }, "consent required"]
   ];
@@ -251,6 +253,17 @@ test("doPost appends the contract in header order and neutralizes formula-leadin
   assert.equal(sheet.rows[1][23], "'-先看生活圈、正常內容");
   assert.equal(sheet.rows[1][24], "是");
   assert.equal(sheet.rows[1][25], "新名單");
+});
+
+test("doPost appends a normalized LINE ID as a text value in the existing 31-cell row", () => {
+  const runtime = createRuntime();
+  const payload = validPayload({ phone: "tainan.wei_88" });
+  const response = JSON.parse(post(runtime, payload).getContent());
+  const sheet = runtime.sheets.get("C版買方診斷名單");
+
+  assert.deepEqual(response, { ok: true, submissionId: payload.submissionId });
+  assert.equal(sheet.rows[1].length, 31);
+  assert.equal(sheet.rows[1][4], "'tainan.wei_88");
 });
 
 test("doPost deduplicates one submission id while holding and releasing the lock", () => {

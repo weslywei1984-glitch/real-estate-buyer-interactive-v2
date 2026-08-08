@@ -18,7 +18,7 @@ async function installDeferredSubmissionMock(page) {
 
 async function fillValidContact(page) {
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
-  await page.getByLabel("手機號碼").fill("0912345678");
+  await page.getByLabel("手機號碼 or LINE ID").fill("0912345678");
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
 }
 
@@ -257,18 +257,31 @@ test("back navigation preserves answers that are still valid", async ({ page }) 
   await expect(page.getByRole("button", { name: "3個月內", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("invalid phone cannot submit and exposes field guidance", async ({ page }) => {
+test("contact validation accepts 手機號碼 or LINE ID and exposes field guidance", async ({ page }) => {
   await page.goto("/?testStep=result");
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
-  await page.getByLabel("手機號碼").fill("1234");
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toHaveAttribute("aria-describedby", "phoneGuidance");
+  await expect(page.getByText("手機輸入10碼，例09XX；LINE ID 可直接輸入")).toBeVisible();
+  await page.getByLabel("手機號碼 or LINE ID").fill("1234");
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
-  await expect(page.getByText("請輸入 09 開頭的 10 碼手機號碼")).toBeVisible();
-  await expect(page.getByLabel("手機號碼")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("請輸入 09 開頭的 10 碼手機號碼或合法 LINE ID")).toBeVisible();
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toHaveAttribute("aria-invalid", "true");
 
   await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
-  await expect(page.getByRole("alert")).toContainText("09 開頭的 10 碼手機號碼");
-  await expect(page.getByLabel("手機號碼")).toBeFocused();
+  await expect(page.getByRole("alert")).toContainText("09 開頭的 10 碼手機號碼或合法 LINE ID");
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toBeFocused();
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toHaveCount(0);
+});
+
+test("手機號碼 or LINE ID normalizes a LINE ID before submission", async ({ page }) => {
+  await page.goto("/?testStep=result");
+  await installDeferredSubmissionMock(page);
+  await page.getByLabel("怎麼稱呼您？").fill("王小姐");
+  await page.getByLabel("手機號碼 or LINE ID").fill("Tainan.Wei_88");
+  await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+
+  await expect.poll(() => page.evaluate(() => window.__capturedPayload.phone)).toBe("tainan.wei_88");
 });
 
 test("submits even without crypto.randomUUID, as on a plain http origin", async ({ page }) => {
@@ -391,7 +404,7 @@ test("every missing contact field names itself instead of silently doing nothing
   await expect(page.getByLabel("怎麼稱呼您？")).toBeFocused();
 
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
-  await page.getByLabel("手機號碼").fill("0912345678");
+  await page.getByLabel("手機號碼 or LINE ID").fill("0912345678");
   await submit.click();
   await expect(page.getByRole("alert")).toContainText("我同意由小魏依這份結果與我聯繫");
   await expect(page.getByLabel("我同意由小魏依這份結果與我聯繫")).toBeFocused();
@@ -401,7 +414,7 @@ test("missing backend reports an honest error and keeps answers available", asyn
   await page.goto("/?testStep=result");
   await page.evaluate(() => window.__buyerAppTest.configureServices({ endpoint: "" }));
   await page.getByLabel("怎麼稱呼您？").fill("王小姐");
-  await page.getByLabel("手機號碼").fill("0912345678");
+  await page.getByLabel("手機號碼 or LINE ID").fill("0912345678");
   await page.getByLabel("我同意由小魏依這份結果與我聯繫").check();
   await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
   await expect(page.getByRole("alert")).toContainText("尚未設定獨立後端，資料還沒有送出");
@@ -425,7 +438,7 @@ test("submission locks mutable controls and confirmed success uses the immutable
   await expect(page.getByRole("button", { name: "確認資料入表中…" })).toBeDisabled();
   await expect(page.locator("#leadForm")).toHaveAttribute("aria-busy", "true");
   await expect(page.getByLabel("怎麼稱呼您？")).toBeDisabled();
-  await expect(page.getByLabel("手機號碼")).toBeDisabled();
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toBeDisabled();
   await expect(page.getByLabel("我同意由小魏依這份結果與我聯繫")).toBeDisabled();
   await expect(page.getByRole("button", { name: "回上一步" })).toBeDisabled();
   await expect(page.getByRole("link", { name: "回到買房方向診斷首頁" })).toHaveAttribute("aria-disabled", "true");
@@ -500,8 +513,8 @@ test("submission error unlocks controls and preserves contact answers for retry"
   await expect(page.locator("#leadForm")).toHaveAttribute("aria-busy", "false");
   await expect(page.getByLabel("怎麼稱呼您？")).toBeEnabled();
   await expect(page.getByLabel("怎麼稱呼您？")).toHaveValue("王小姐");
-  await expect(page.getByLabel("手機號碼")).toBeEnabled();
-  await expect(page.getByLabel("手機號碼")).toHaveValue("0912345678");
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toBeEnabled();
+  await expect(page.getByLabel("手機號碼 or LINE ID")).toHaveValue("0912345678");
   await expect(page.getByRole("button", { name: "回上一步" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
 });
@@ -547,7 +560,7 @@ test("editing contact details after a failed attempt creates a fresh snapshot", 
     window.__submissionControl.reject(error);
   });
   await expect(page.getByRole("button", { name: "重新送出並確認" })).toBeEnabled();
-  await page.getByLabel("手機號碼").fill("0987654321");
+  await page.getByLabel("手機號碼 or LINE ID").fill("0987654321");
 
   await page.evaluate(() => {
     window.__buyerAppTest.configureServices({
