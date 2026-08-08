@@ -393,10 +393,10 @@ test("reduced motion reveals confirmed content without stagger delay", async ({ 
 
 test("call action is available before and after confirmation", async ({ page }) => {
   await page.goto("/?testStep=result");
-  const resultCall = page.getByRole("link", { name: /直接撥打/ });
+  const resultCall = page.getByRole("link", { name: "直接撥打", exact: true });
   await expect(resultCall).toBeVisible();
   await expect(resultCall).toHaveAttribute("href", "tel:0927617207");
-  await expect(resultCall).toContainText("0927-617-207");
+  await expect(resultCall).not.toContainText("0927-617-207");
 
   await installDeferredSubmissionMock(page);
   await fillValidContact(page);
@@ -407,10 +407,10 @@ test("call action is available before and after confirmation", async ({ page }) 
   }));
   await expect(page.getByRole("heading", { name: "完整方向卡已確認送出" })).toBeVisible();
 
-  const call = page.getByRole("link", { name: /直接撥打/ });
+  const call = page.getByRole("link", { name: "直接撥打", exact: true });
   await expect(call).toBeVisible();
   await expect(call).toHaveAttribute("href", "tel:0927617207");
-  await expect(call).toContainText("0927-617-207");
+  await expect(call).not.toContainText("0927-617-207");
 });
 
 test("every missing contact field names itself instead of silently doing nothing", async ({ page }) => {
@@ -675,8 +675,23 @@ test("focus indicator has at least 3 to 1 contrast on both card backgrounds", as
 
 test("LINE contact uses the approved add-friend link", async ({ page }) => {
   await page.goto("/?testStep=result");
-  const lineHref = await page.getByRole("link", { name: "改用 LINE 聯絡" }).getAttribute("href");
-  expect(lineHref).toBe("https://line.me/R/ti/p/%40tainanwei");
+  const line = page.getByRole("link", { name: "LINE詢問", exact: true });
+  await expect(line).toHaveAttribute("href", "https://line.me/R/ti/p/%40tainanwei");
+  await expect(line).toHaveAttribute("target", "_blank");
+  await expect(page.locator('[class*="qr" i], [id*="qr" i], img[alt*="qr" i], img[src*="qr" i], canvas[data-qr]')).toHaveCount(0);
+
+  await installDeferredSubmissionMock(page);
+  await fillValidContact(page);
+  await page.getByRole("button", { name: "免費取得完整方向卡" }).click();
+  await page.evaluate(() => window.__submissionControl.resolve({
+    ok: true,
+    submissionId: window.__capturedPayload.submissionId
+  }));
+  await expect(page.getByRole("link", { name: "LINE詢問", exact: true })).toHaveAttribute(
+    "href",
+    "https://line.me/R/ti/p/%40tainanwei"
+  );
+  await expect(page.locator('[class*="qr" i], [id*="qr" i], img[alt*="qr" i], img[src*="qr" i], canvas[data-qr]')).toHaveCount(0);
 });
 
 test("儲存需求照片 downloads the public result card before contact", async ({ page }) => {

@@ -558,8 +558,8 @@ function renderResult({ focus = true } = {}) {
       <div class="fallback-actions">
         <button id="resultBack" type="button"${locked}>回上一步</button>
         <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
-        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
-        <a href="${LINE_URL}" target="_blank" rel="noopener">改用 LINE 聯絡</a>
+        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打</a>
+        <a href="${LINE_URL}" target="_blank" rel="noopener">LINE詢問</a>
       </div>
     </form>`;
   bindContactEvents();
@@ -628,8 +628,8 @@ function renderComplete({ focus = true } = {}) {
       <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店</p>
       <div class="fallback-actions">
         <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
-        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打 ${PHONE}</a>
-        <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找台南小魏</a>
+        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打</a>
+        <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE詢問</a>
       </div>
     </section>`;
   $("saveImageButton").addEventListener("click", saveResultImage);
