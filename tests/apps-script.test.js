@@ -217,6 +217,7 @@ test("doPost validates version, submission id, contact, name, and consent", () =
     ["wrong-version", { sourceVersion: "old" }, "invalid source version"],
     ["bad-id", { submissionId: "short" }, "invalid submission id"],
     ["bad-phone", { phone: "0212345678" }, "invalid contact"],
+    ["short-numeric-contact", { phone: "091234567" }, "invalid contact"],
     ["space-in-line-id", { phone: "tainan wei" }, "invalid contact"],
     ["unsupported-line-id-symbol", { phone: "tainan/wei" }, "invalid contact"],
     ["missing-name", { name: "   " }, "name required"],
@@ -264,6 +265,22 @@ test("doPost appends a normalized LINE ID as a text value in the existing 31-cel
   assert.deepEqual(response, { ok: true, submissionId: payload.submissionId });
   assert.equal(sheet.rows[1].length, 31);
   assert.equal(sheet.rows[1][4], "'tainan.wei_88");
+});
+
+test("doPost normalizes direct LINE ID and mobile payloads before storing text", () => {
+  for (const [phone, expected] of [
+    ["Tainan.Wei_88", "'tainan.wei_88"],
+    ["0912-345-678", "'0912345678"]
+  ]) {
+    const runtime = createRuntime();
+    const payload = validPayload({ phone });
+    const response = JSON.parse(post(runtime, payload).getContent());
+    const sheet = runtime.sheets.get("C版買方診斷名單");
+
+    assert.deepEqual(response, { ok: true, submissionId: payload.submissionId }, phone);
+    assert.equal(sheet.rows[1].length, 31, phone);
+    assert.equal(sheet.rows[1][4], expected, phone);
+  }
 });
 
 test("doPost deduplicates one submission id while holding and releasing the lock", () => {
