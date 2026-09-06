@@ -39,7 +39,8 @@ test("five-step journey exposes complete results before contact", async ({page})
   await expect(page.locator(".result-facts").first()).toContainText("3房");
   await expect(page.locator(".result-facts").first()).toContainText("1. 格局 → 2. 安靜");
   await expect(page.locator("[data-preview-priority]")).toHaveCount(3);
-  await expect(page.locator("#contactDetails")).not.toHaveAttribute("open", "");
+  await expect(page.locator("#contactDetails")).toHaveAttribute("open", "");
+  await expect(page.getByLabel("怎麼稱呼您？")).toBeVisible();
   await expect(page.getByRole("button", {name:"儲存需求照片"})).toBeVisible();
   expect(errors).toEqual([]);
 });

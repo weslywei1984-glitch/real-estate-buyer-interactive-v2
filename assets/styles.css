@@ -1259,3 +1259,10 @@ legend { font-size: 14px; margin-bottom: 10px; }
   [data-field-group="mustHaves"] .choice-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   [data-field-group="mustHaves"] .choice { flex-direction: column; min-height: 68px; }
 }
+.lead-prompt { display: flex; width: 100%; min-height: 52px; margin: 20px 0 8px; padding: 14px 16px; font-size: 14px; box-shadow: none; }
+.contact-details { border-color: #9faf8b; background: #f6f8ee; }
+.contact-details > summary { font-weight: 800; color: var(--ink); }
+.contact-card { background: transparent; scroll-margin-top: 24px; }
+.contact-card .contact-intro { margin-top: 0; color: #3e5637; }
+.contact-card .contact-privacy { font-size: 11px; line-height: 1.7; color: #64745c; margin: 12px 0; }
+.contact-card #submitButton { width: 100%; min-height: 52px; box-shadow: none; }

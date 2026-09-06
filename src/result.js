@@ -1,4 +1,4 @@
-import { resolveAnswer } from "./questions.js?v=20260906-r1";
+import { resolveAnswer } from "./questions.js?v=20260906-r2";
 
 const PRIORITY_ACTIONS = {
   地點: "把上班、接送或探望家人的路線走一遍，確認這個地點適合每天生活。",

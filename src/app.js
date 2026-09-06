@@ -5,10 +5,10 @@ import {
   customFieldFor,
   needsThirdRoomUse,
   validateStep
-} from "./questions.js?v=20260906-r1";
-import { deriveResult } from "./result.js?v=20260906-r1";
-import { downloadResultImage } from "./result-image.js?v=20260906-r1";
-import { buildPayload, buildSummary } from "./payload.js?v=20260906-r1";
+} from "./questions.js?v=20260906-r2";
+import { deriveResult } from "./result.js?v=20260906-r2";
+import { downloadResultImage } from "./result-image.js?v=20260906-r2";
+import { buildPayload, buildSummary } from "./payload.js?v=20260906-r2";
 import { isValidContact, normalizeContact } from "./contact.js";
 import { submitLead } from "./api.js";
 import { randomId } from "./random.js";
@@ -24,7 +24,7 @@ const state = {
   phoneTouched: false,
   noGosExpanded: false,
   optionalSections: {},
-  contactExpanded: false,
+  contactExpanded: true,
   editingResult: false,
   stepErrors: {},
   stepErrorTitle: "請先完成這一題",
@@ -430,7 +430,7 @@ function renderIntro({ focus = true } = {}) {
       <p class="eyebrow">找房之前，先找到自己的方向</p>
       <h1 tabindex="-1">你的下一個家，<br><em>從這裡開始。</em></h1>
       <p class="hero-copy">點一點你的生活、預算與喜好，<br>把「想買房」變成清楚的找房清單。</p>
-      <div class="intro-meta"><span>5 個小步驟</span><span>免留資料看結果</span></div>
+      <div class="intro-meta"><span>5 個小步驟</span><span>整理你的找房清單</span></div>
       <button class="primary" id="startButton" type="button">找找我的買房方向 <span aria-hidden="true">↗</span></button>
       <p class="hero-footnote">還沒想好也可以，邊選邊找到答案。</p>
     </div>
@@ -502,6 +502,7 @@ function resultPreview(result) {
     <span class="result-status">${escapeHtml(result.status)}</span>
     <h2 tabindex="-1">${headlineLines.map(line => `<span class="result-headline-line">${escapeHtml(line)}</span>`).join("")}</h2>
     <dl class="result-facts">${result.facts.filter(fact => mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
+    ${state.phase !== "complete" ? `<a class="primary lead-prompt" id="leadJump" href="#leadForm">用這份需求，請小魏幫我找房 ↗</a>` : ""}
     <details class="result-details"><summary>查看完整條件與預算提醒</summary>
       <dl class="result-facts">${result.facts.filter(fact => !mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
       <p class="budget-note">${escapeHtml(result.budgetReminder)}</p>
@@ -528,6 +529,12 @@ function bindResultEdits() {
 
 function bindContactEvents() {
   bindResultEdits();
+  $("leadJump")?.addEventListener("click", event => {
+    event.preventDefault();
+    state.contactExpanded = true;
+    $("contactDetails").open = true;
+    focusElement($("name"));
+  });
   $("contactDetails").addEventListener("toggle", event => {
     if (event.currentTarget.isConnected) state.contactExpanded = event.currentTarget.open;
   });
@@ -591,26 +598,26 @@ function renderResult({ focus = true } = {}) {
       : "請小魏聯絡我";
 
   $("resultArea").innerHTML = `${resultPreview(result)}
-    <div class="result-actions fallback-actions">
-      <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
-      <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找小魏聊聊 ↗</a>
-    </div>
     <details id="contactDetails" class="contact-details" ${state.contactExpanded || state.submitting || state.submitError ? "open" : ""}>
-    <summary>想請小魏幫你縮小範圍？<span>留下聯絡方式</span></summary>
+    <summary>下一步，讓小魏幫你找房<span>依你的需求回覆</span></summary>
     <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
-      <h3>把找房清單交給小魏</h3>
-      <p class="contact-intro">只用來回覆這次買房需求，由小魏依你的條件與你聯繫。</p>
+      <p class="contact-intro">留下稱呼及手機或 LINE ID，小魏會依你的生活圈、預算與必要條件，和你一起縮小找房範圍。</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}><span class="field-guidance name-guidance" aria-hidden="true"></span></label>
         <label class="field" for="phone"><span>手機號碼或 LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
       </div>
       <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}${locked}><span>我同意由小魏依這份結果與我聯繫</span></label>
+      <p class="contact-privacy">聯絡資料只用於回覆這次需求；也可以先保存清單，之後再聊。</p>
       <div class="form-error" id="submitError" role="alert" tabindex="-1">${escapeHtml(state.submitError)}</div>
       <div class="submit-row">
         <button class="primary" id="submitButton" type="submit">${buttonLabel}</button>
         <p class="submit-state" id="submitState" role="status">${state.submitting ? "正在送出你的找房清單，請稍候。" : ""}</p>
       </div>
     </form></details>
+    <div class="result-actions fallback-actions">
+      <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
+      <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找小魏聊聊 ↗</a>
+    </div>
     <div class="result-footer"><button id="resultBack" type="button"${locked}>回上一步</button>
       <a href="tel:${PHONE.replaceAll("-", "")}">直接撥打 ${PHONE}</a>
       <p>台南小魏 買厝作伙<br>魏泉承｜永慶不動產-小東南紡店</p>
