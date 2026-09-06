@@ -5,23 +5,14 @@ import {
   customFieldFor,
   needsThirdRoomUse,
   validateStep
-} from "./questions.js";
-import { deriveResult } from "./result.js";
-import { downloadResultImage } from "./result-image.js";
-import { buildPayload, buildSummary } from "./payload.js";
+} from "./questions.js?v=20260906-r1";
+import { deriveResult } from "./result.js?v=20260906-r1";
+import { downloadResultImage } from "./result-image.js?v=20260906-r1";
+import { buildPayload, buildSummary } from "./payload.js?v=20260906-r1";
 import { isValidContact, normalizeContact } from "./contact.js";
 import { submitLead } from "./api.js";
 import { randomId } from "./random.js";
 import { BACKEND_URL, LINE_URL, PHONE } from "./config.js";
-
-const STEP_MILESTONES = [
-  "目的定下來後，後面會更快。",
-  "生活圈有方向了。",
-  "負擔範圍更清楚了。",
-  "空間需求整理好了。",
-  "物件範圍縮小了。",
-  "可以看方向卡了。"
-];
 
 const state = {
   answers: createInitialAnswers(),
@@ -32,6 +23,9 @@ const state = {
   submitAttempted: false,
   phoneTouched: false,
   noGosExpanded: false,
+  optionalSections: {},
+  contactExpanded: false,
+  editingResult: false,
   stepErrors: {},
   stepErrorTitle: "請先完成這一題",
   activeSubmission: null,
@@ -119,7 +113,7 @@ function syncStepErrorUi() {
       target.setAttribute("aria-describedby", errorId);
     });
 
-    const ownerKey = errorKey === "areas" ? "customArea" : errorKey;
+    const ownerKey = errorKey;
     const owner = questionArea.querySelector(`[data-text-field="${ownerKey}"]`)?.closest(".field")
       || questionArea.querySelector(`[data-field-group="${ownerKey}"]`);
     if (owner) {
@@ -142,7 +136,7 @@ function focusElement(element) {
 function focusChoice(field, value) {
   const target = [...document.querySelectorAll("[data-field]")]
     .find(button => button.dataset.field === field && button.dataset.value === value);
-  focusElement(target);
+  target?.focus({ preventScroll: true });
 }
 
 function setAnswer(key, value, focusValue = value) {
@@ -163,6 +157,12 @@ function setAnswer(key, value, focusValue = value) {
 function showStepErrors(errors, title = "請先完成這一題") {
   state.stepErrors = { ...errors };
   state.stepErrorTitle = title;
+  const step = QUESTION_STEPS[state.stepIndex];
+  const hiddenOptionalError = step?.fields.some(field => field.optional
+    && (errors[field.key] || (field.custom && errors[field.custom.key])));
+  if (hiddenOptionalError) state.optionalSections[step.id] = true;
+  if (errors.otherNoGo) state.noGosExpanded = true;
+  if (hiddenOptionalError || errors.otherNoGo) render({ focus: false });
   syncStepErrorUi();
   focusElement($("formError"));
 }
@@ -186,6 +186,12 @@ function goNext() {
   }
 
   clearAllStepErrors();
+  if (state.editingResult) {
+    state.editingResult = false;
+    state.phase = "result";
+    render();
+    return;
+  }
   if (state.stepIndex === QUESTION_STEPS.length - 1) {
     state.phase = "result";
   } else {
@@ -332,7 +338,7 @@ function renderField(field) {
   const values = field.type === "multi" ? state.answers[field.key] : [state.answers[field.key]];
   const compact = field.options.every(option => [...option].length <= 6) ? " compact" : "";
   const hint = field.max
-    ? `<span class="field-guidance selected-summary" role="status">還能選 ${Math.max(0, field.max - values.length)} 個</span>`
+    ? `<span class="field-guidance selected-summary" role="status">${values.length ? `已選 ${values.length}／${field.max}，依點選順序排列` : `選 1～${field.max} 個就好`}</span>`
     : field.type === "multi" ? `<span class="field-guidance">可複選</span>` : "";
   const custom = field.custom && state.answers[field.key] === field.custom.option
     ? `<label class="field custom-field" for="field-${field.custom.key}">
@@ -342,10 +348,12 @@ function renderField(field) {
     : "";
   return `<fieldset data-field-group="${field.key}">
     <legend>${escapeHtml(field.label)}</legend>${hint}
-    <div class="choice-grid${compact}">
-      ${field.options.map(option => {
+    <div class="choice-grid${compact}${field.descriptions ? " purpose-grid" : ""}">
+      ${field.options.map((option, index) => {
         const selected = values.includes(option);
-        return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}"${disabled}>${escapeHtml(option)}</button>`;
+        const rank = field.max && selected ? `<span class="choice-rank" aria-hidden="true">${values.indexOf(option) + 1}</span>` : "";
+        const description = field.descriptions ? `<small>${escapeHtml(field.descriptions[index])}</small>` : "";
+        return `<button class="choice${selected ? " selected" : ""}" type="button" aria-label="${escapeHtml(option)}" data-field="${field.key}" data-type="${field.type}" data-value="${escapeHtml(option)}" data-max="${field.max || ""}" data-exclusive="${escapeHtml(field.exclusive || "")}" aria-pressed="${selected}"${disabled}>${rank}<span>${escapeHtml(option)}</span>${description}</button>`;
       }).join("")}
     </div>
     ${custom}
@@ -373,7 +381,7 @@ function bindQuestionEvents() {
           : [...values, value];
 
         if (max && values.length > Number(max)) {
-          showStepErrors({ [field]: `最多選擇 ${max} 個` }, "請調整選擇");
+          showToast(`已選滿 ${max} 個，先取消一個再換選吧。`);
           return;
         }
       }
@@ -386,9 +394,21 @@ function bindQuestionEvents() {
       if (state.submitting) return;
       const fieldKey = event.currentTarget.dataset.textField;
       state.answers[fieldKey] = event.currentTarget.value;
+      if (fieldKey === "customArea" && event.currentTarget.value.trim()) {
+        state.answers.areas = state.answers.areas.filter(area => area !== "還沒決定");
+        const undecided = document.querySelector('[data-field="areas"][data-value="還沒決定"]');
+        undecided?.classList.remove("selected");
+        undecided?.setAttribute("aria-pressed", "false");
+      }
       state.answers = clearHiddenAnswers(state.answers);
       refreshStepErrorState();
       syncStepErrorUi();
+    });
+  });
+
+  document.querySelectorAll("[data-optional-section]").forEach(details => {
+    details.addEventListener("toggle", () => {
+      if (details.isConnected) state.optionalSections[details.dataset.optionalSection] = details.open;
     });
   });
 
@@ -407,16 +427,18 @@ function renderIntro({ focus = true } = {}) {
   $("resultArea").hidden = true;
   $("hero").innerHTML = `<div class="hero-layout">
     <div>
-      <p class="eyebrow">台南小魏 · 買厝作伙</p>
-      <h1 tabindex="-1">找到適合生活的房子，從問對問題開始。</h1>
-      <p class="hero-copy">用 6 個關鍵選擇，先整理生活圈、舒服負擔與真正底線。</p>
-      <div class="intro-meta"><span>約 60～90 秒完成</span><span>可隨時返回修改</span></div>
-      <button class="primary" id="startButton" type="button">開始整理</button>
+      <p class="eyebrow">找房之前，先找到自己的方向</p>
+      <h1 tabindex="-1">你的下一個家，<br><em>從這裡開始。</em></h1>
+      <p class="hero-copy">點一點你的生活、預算與喜好，<br>把「想買房」變成清楚的找房清單。</p>
+      <div class="intro-meta"><span>5 個小步驟</span><span>免留資料看結果</span></div>
+      <button class="primary" id="startButton" type="button">找找我的買房方向 <span aria-hidden="true">↗</span></button>
+      <p class="hero-footnote">還沒想好也可以，邊選邊找到答案。</p>
     </div>
     <aside class="consultant-note" aria-label="小魏提醒">
-      <small>CONSULTANT NOTE</small>
-      <blockquote>「裝潢可以改，格局與每天的生活方式，更值得先確認。」</blockquote>
-      <p>魏泉承｜永慶不動產－小東南紡店</p>
+      <div class="home-sketch" aria-hidden="true"><i class="home-roof"></i><i class="home-window"></i><i class="home-door"></i><span class="home-sun">✳</span><span class="home-heart">♡</span></div>
+      <small>一張清單，讓找房更有方向</small>
+      <blockquote>房子很多，<br>適合你的生活最重要。</blockquote>
+      <p>台南小魏 買厝作伙<br>魏泉承｜永慶不動產-小東南紡店<br><a href="tel:0927617207">0927-617-207</a></p>
     </aside>
   </div>`;
   $("startButton").addEventListener("click", goNext);
@@ -429,7 +451,7 @@ function renderQuestion({ focus = true } = {}) {
   $("resultArea").hidden = true;
   const step = QUESTION_STEPS[state.stepIndex];
   const currentStep = state.stepIndex + 1;
-  $("progressText").textContent = `第 ${currentStep} 題，共 ${QUESTION_STEPS.length} 題`;
+  $("progressText").textContent = `${String(currentStep).padStart(2, "0")} / ${String(QUESTION_STEPS.length).padStart(2, "0")}　${step.label}`;
   const progressRow = $("progressText").parentElement;
   let milestone = progressRow.querySelector(".progress-milestone");
   if (!milestone) {
@@ -437,30 +459,34 @@ function renderQuestion({ focus = true } = {}) {
     milestone.className = "progress-milestone";
     progressRow.append(milestone);
   }
-  milestone.textContent = STEP_MILESTONES[state.stepIndex];
+  milestone.innerHTML = QUESTION_STEPS.map((item, index) => `<span class="step-stop${index === state.stepIndex ? " current" : ""}${index < state.stepIndex ? " done" : ""}" ${index === state.stepIndex ? 'aria-current="step"' : ""}><i aria-hidden="true">${index < state.stepIndex ? "✓" : index + 1}</i>${item.label}</span>`).join("");
   $("progressBar").style.width = `${(currentStep / QUESTION_STEPS.length) * 100}%`;
   const progress = document.querySelector("[role='progressbar']");
   progress.setAttribute("aria-valuemax", String(QUESTION_STEPS.length));
   progress.setAttribute("aria-valuenow", String(currentStep));
-  progress.setAttribute("aria-valuetext", `第 ${currentStep} 題，共 ${QUESTION_STEPS.length} 題`);
+  progress.setAttribute("aria-valuetext", `第 ${currentStep} 步，共 ${QUESTION_STEPS.length} 步：${step.label}`);
+  const optional = step.fields.filter(field => field.optional || field.key === "customArea");
+  const required = step.fields.filter(field => !optional.includes(field));
+  const optionalTitle = step.id === "location" ? "指定生活圈、通勤需求" : "屋齡、居住人數等細節";
+  const optionalFields = optional.length ? `<details class="optional-details" data-optional-section="${step.id}" ${state.optionalSections[step.id] ? "open" : ""}>
+    <summary>${optionalTitle}<span>選填</span></summary><div class="optional-panel">${optional.map(renderField).join("")}</div></details>` : "";
   const questionFields = step.id === "priorities"
     ? `${renderField(step.fields[0])}
       <button class="optional-toggle" id="optionalNoGosToggle" type="button" aria-expanded="${state.noGosExpanded}" aria-controls="optionalNoGos">
         有一定避開的條件嗎？<span>選填</span>
       </button>
-      ${state.noGosExpanded ? `<div class="optional-panel" id="optionalNoGos">${step.fields.slice(1).map(renderField).join("")}</div>` : ""}`
-    : step.fields.map(renderField).join("");
+      <div class="optional-panel" id="optionalNoGos" ${state.noGosExpanded ? "" : "hidden"}>${step.fields.slice(1).map(renderField).join("")}</div>`
+    : `${required.map(renderField).join("")}${optionalFields}`;
   $("questionArea").innerHTML = `<article class="question-card">
-    <p class="eyebrow">買房方向診斷 · ${String(currentStep).padStart(2, "0")}</p>
     <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
-    <div class="advisor-tip"><strong>小魏提醒：</strong>${escapeHtml(step.tip)}</div>
+    <p class="question-hint">${escapeHtml(step.tip)}</p>
     ${questionFields}
   </article>`;
   $("backButton").onclick = goBack;
   $("nextButton").onclick = goNext;
   $("backButton").disabled = state.submitting;
   $("nextButton").disabled = state.submitting;
-  $("nextButton").textContent = state.stepIndex === QUESTION_STEPS.length - 1 ? "查看方向" : "下一題";
+  $("nextButton").textContent = state.editingResult ? "更新方向卡" : state.stepIndex === QUESTION_STEPS.length - 1 ? "看我的找房清單 ↗" : "下一步 →";
   bindQuestionEvents();
   syncStepErrorUi();
   if (focus) focusElement($("questionArea").querySelector("h2"));
@@ -468,19 +494,43 @@ function renderQuestion({ focus = true } = {}) {
 
 function resultPreview(result) {
   const headlineLines = result.headline.split("\n");
+  const mainLabels = ["生活圈", "舒服預算", "理想的家", "優先順序"];
+  if (result.facts.some(fact => fact.label === "一定避開" && !fact.value.startsWith("未填"))) mainLabels.push("一定避開");
+  const factHtml = fact => `<div class="result-fact"><dt>${escapeHtml(fact.label)}</dt><dd>${escapeHtml(fact.value)}</dd><button class="edit-fact" type="button" data-edit-step="${fact.step}" aria-label="修改${escapeHtml(fact.label)}" ${state.submitting ? "disabled" : ""}>修改</button></div>`;
   return `<article class="result-card">
+    <p class="eyebrow">YOUR HOME NOTES · 我的找房清單</p>
     <span class="result-status">${escapeHtml(result.status)}</span>
     <h2 tabindex="-1">${headlineLines.map(line => `<span class="result-headline-line">${escapeHtml(line)}</span>`).join("")}</h2>
-    <h3>目前找房方向</h3>
-    <ul class="direction-list">${result.direction.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-    <h3>預算提醒</h3>
-    <p>${escapeHtml(result.budgetReminder)}</p>
-    <h3>最值得先確認的 3 件事</h3>
+    <dl class="result-facts">${result.facts.filter(fact => mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
+    <details class="result-details"><summary>查看完整條件與預算提醒</summary>
+      <dl class="result-facts">${result.facts.filter(fact => !mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
+      <p class="budget-note">${escapeHtml(result.budgetReminder)}</p>
+    </details>
+    <h3>接下來，先做這 3 件事</h3>
     <ol class="preview-priorities">${result.priorityPreview.map(item => `<li data-preview-priority>${escapeHtml(item.text)}</li>`).join("")}</ol>
+    <p class="result-note">依你的回答整理，尚未比對即時物件與貸款條件。</p>
   </article>`;
 }
 
+function bindResultEdits() {
+  document.querySelectorAll("[data-edit-step]").forEach(button => {
+    if (state.phase === "complete") { button.hidden = true; return; }
+    button.addEventListener("click", () => {
+      if (state.submitting) return;
+      state.stepIndex = QUESTION_STEPS.findIndex(step => step.id === button.dataset.editStep);
+      state.editingResult = true;
+      state.phase = "questions";
+      clearAllStepErrors();
+      render();
+    });
+  });
+}
+
 function bindContactEvents() {
+  bindResultEdits();
+  $("contactDetails").addEventListener("toggle", event => {
+    if (event.currentTarget.isConnected) state.contactExpanded = event.currentTarget.open;
+  });
   $("name").addEventListener("input", event => {
     if (state.submitting) return;
     state.answers.name = event.target.value;
@@ -535,33 +585,36 @@ function renderResult({ focus = true } = {}) {
   const result = currentActiveSubmission()?.result || deriveResult(state.answers);
   const locked = state.submitting ? " disabled" : "";
   const buttonLabel = state.submitting
-    ? "確認資料入表中…"
+    ? "正在送出…"
     : state.submitAttempted && state.submitError
       ? "重新送出並確認"
-      : "免費取得完整方向卡";
+      : "請小魏聯絡我";
 
   $("resultArea").innerHTML = `${resultPreview(result)}
+    <div class="result-actions fallback-actions">
+      <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
+      <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找小魏聊聊 ↗</a>
+    </div>
+    <details id="contactDetails" class="contact-details" ${state.contactExpanded || state.submitting || state.submitError ? "open" : ""}>
+    <summary>想請小魏幫你縮小範圍？<span>留下聯絡方式</span></summary>
     <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
-      <p class="eyebrow">最後一步 · 確認聯絡方式</p>
-      <h3>免費取得完整看屋方向卡</h3>
-      <p class="contact-intro">資料只用於回覆這次需求，不會用來發送無關訊息。送出後會先確認資料確實入表；確認前不會顯示成功。若目前不方便送出，也可儲存需求照片或改用 LINE。</p>
+      <h3>把找房清單交給小魏</h3>
+      <p class="contact-intro">只用來回覆這次買房需求，由小魏依你的條件與你聯繫。</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}><span class="field-guidance name-guidance" aria-hidden="true"></span></label>
-        <label class="field" for="phone"><span>手機號碼 or LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
+        <label class="field" for="phone"><span>手機號碼或 LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
       </div>
       <label class="consent" for="consent"><input id="consent" type="checkbox" ${state.answers.consent ? "checked" : ""}${locked}><span>我同意由小魏依這份結果與我聯繫</span></label>
       <div class="form-error" id="submitError" role="alert" tabindex="-1">${escapeHtml(state.submitError)}</div>
       <div class="submit-row">
         <button class="primary" id="submitButton" type="submit">${buttonLabel}</button>
-        <p class="submit-state" id="submitState" role="status">${state.submitting ? "正在送出，並確認資料是否已入表，請稍候。" : "送出期間請不要關閉頁面。"}</p>
+        <p class="submit-state" id="submitState" role="status">${state.submitting ? "正在送出你的找房清單，請稍候。" : ""}</p>
       </div>
-      <div class="fallback-actions">
-        <button id="resultBack" type="button"${locked}>回上一步</button>
-        <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
-        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打</a>
-        <a href="${LINE_URL}" target="_blank" rel="noopener">LINE詢問</a>
-      </div>
-    </form>`;
+    </form></details>
+    <div class="result-footer"><button id="resultBack" type="button"${locked}>回上一步</button>
+      <a href="tel:${PHONE.replaceAll("-", "")}">直接撥打 ${PHONE}</a>
+      <p>台南小魏 買厝作伙<br>魏泉承｜永慶不動產-小東南紡店</p>
+    </div>`;
   bindContactEvents();
   updateSubmitState();
   if (focus) focusElement($("resultArea").querySelector("h2"));
@@ -595,48 +648,23 @@ function renderComplete({ focus = true } = {}) {
     renderResult({ focus });
     return;
   }
-  const result = snapshot.result;
-  const priorities = result.videoQuestions.filter(item => item.relevant).slice(0, 4);
-  const secondary = result.videoQuestions.filter(item => !priorities.some(priority => priority.ep === item.ep));
-  $("resultArea").innerHTML = `${resultPreview(result)}
+  $("resultArea").innerHTML = `${resultPreview(snapshot.result)}
     <section class="result-card complete-card">
       <div class="complete-seal" aria-hidden="true">✓</div>
-      <h3 tabindex="-1">完整方向卡已確認送出</h3>
-      <p>資料已確認入表，小魏會依這份方向與您聯繫。以下清單也可以先保存，之後看屋時逐項確認。</p>
-      <h3>最適合您的看屋策略</h3>
-      <ul class="strategy-list">${result.strategy.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      <fieldset class="video-list">
-        <legend>看屋前，問自己這 ${result.videoQuestions.length} 題</legend>
-        <div class="video-list-items priority-video-list">${priorities.map(item => `
-          <label class="video-check-item relevant" data-priority-check data-relevant="true">
-            <input type="checkbox">
-            <span class="video-question-text">${escapeHtml(item.text)}</span>
-            <span class="video-relevant-badge">優先確認</span>
-          </label>`).join("")}
-        </div>
-        <details class="secondary-video-details">
-          <summary>查看其餘 6 項（完整 10 項）</summary>
-          <div class="video-list-items">${secondary.map(item => `
-            <label class="video-check-item ${item.relevant ? "relevant" : ""}" data-secondary-check data-relevant="${item.relevant}">
-              <input type="checkbox">
-              <span class="video-question-text">${escapeHtml(item.text)}</span>
-              ${item.relevant ? '<span class="video-relevant-badge">優先確認</span>' : ""}
-            </label>`).join("")}
-          </div>
-        </details>
-      </fieldset>
-      <p class="contact-signature">魏泉承｜永慶不動產-小東南紡店</p>
+      <h3 tabindex="-1">清單已送出，接下來交給小魏。</h3>
+      <p>小魏會依這份需求與你聯繫。也可以先把清單存起來，看屋時隨時對照。</p>
+      <p class="contact-signature">台南小魏 買厝作伙<br>魏泉承｜永慶不動產-小東南紡店｜0927-617-207</p>
       <div class="fallback-actions">
         <button class="save-image-action" id="saveImageButton" type="button"><span aria-hidden="true">↓</span> 儲存需求照片</button>
-        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}"><span aria-hidden="true">📞</span> 直接撥打</a>
-        <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE詢問</a>
+        <a class="call-action" href="tel:${PHONE.replaceAll("-", "")}">直接撥打</a>
+        <a class="primary" href="${LINE_URL}" target="_blank" rel="noopener">LINE 找小魏聊聊 ↗</a>
       </div>
     </section>`;
   $("saveImageButton").addEventListener("click", saveResultImage);
+  bindResultEdits();
   playCompleteAnimation();
   if (focus) focusElement($("resultArea").querySelector("h3[tabindex]"));
 }
-
 function applyLocalTestShortcut() {
   if (!isLocalTestHost()) return;
   const target = new URLSearchParams(location.search).get("testStep");

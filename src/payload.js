@@ -1,4 +1,4 @@
-import { resolveAnswer } from "./questions.js";
+import { resolveAnswer } from "./questions.js?v=20260906-r1";
 import { normalizeContact } from "./contact.js";
 
 function listOf(value) {
@@ -49,6 +49,7 @@ export function buildSummary({ answers, result }) {
     `家庭：${answers.householdSize || "未填"}；房數：${resolveAnswer(answers, "rooms") || "未填"}／${answers.thirdRoomUse || "無需填寫"}`,
     `物件：${(answers.propertyTypes || []).join("、") || "未填"}／${resolveAnswer(answers, "agePreference") || "未填"}／${answers.parking || "未填"}`,
     `必備：${(answers.mustHaves || []).join("、") || "未填"}`,
+    `一定避開：${(answers.noGos || []).map(value => value === "其他" ? answers.otherNoGo : value).filter(Boolean).join("、") || "未填"}`,
     ...(answers.moveInBudget ? [`入住整理預算：${answers.moveInBudget}`] : []),
     ...(answers.conditionTolerance ? [`屋況接受度：${answers.conditionTolerance}`] : []),
     ...(answers.decisionLimit ? [`出價心理底線：${answers.decisionLimit}`] : []),

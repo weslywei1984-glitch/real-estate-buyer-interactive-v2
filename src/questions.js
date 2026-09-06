@@ -1,24 +1,24 @@
 export const QUESTION_STEPS = [
   {
-    id: "intent", title: "這次買房，最主要是為了什麼？",
-    tip: "先確認目的與時間，才不會一開始看很多、方向卻越來越亂。",
+    id: "intent", label: "買房計畫", title: "這次，想找一個怎樣的家？",
+    tip: "選最接近現在的想法，之後都能改。",
     fields: [
-      { key: "purpose", label: "購屋目的", type: "single", options: ["自住", "換屋", "婚房", "幫家人找", "投資／置產", "先了解行情"] },
+      { key: "purpose", label: "買房的原因", type: "single", options: ["自住", "換屋", "婚房", "幫家人找", "投資／置產", "先了解行情"], descriptions: ["住進自己的家", "讓生活升級", "一起開始新生活", "替重要的人挑選", "先把條件算清楚", "還在找靈感"] },
       { key: "timeline", label: "預計時程", type: "single", options: ["1個月內", "3個月內", "半年內", "一年內", "先看看"] }
     ]
   },
   {
-    id: "location", title: "每天的生活，主要會落在哪裡？",
-    tip: "看屋不只看室內，也要把通勤、採買與家人動線放進來。",
+    id: "location", label: "生活圈", title: "你想把生活，安放在哪裡？",
+    tip: "可選幾個區域；沒有方向也沒關係。",
     fields: [
-      { key: "areas", label: "想找區域", type: "multi", options: ["東區", "永康區", "安南區", "北區", "南區", "仁德區", "歸仁區", "新市／善化"] },
+      { key: "areas", label: "想住的區域", type: "multi", exclusive: "還沒決定", options: ["東區", "永康區", "北區", "安南區", "中西區", "南區", "仁德區", "歸仁區", "新市區", "善化區", "還沒決定"] },
       { key: "customArea", label: "其他區域", type: "text", placeholder: "例：東橋、平實，或其他生活圈" },
-      { key: "lifeFocus", label: "生活重心，可複選", type: "multi", exclusive: "無固定地點", options: ["工作通勤", "學校接送", "家人照顧", "日常採買", "無固定地點"] }
+      { key: "lifeFocus", label: "希望顧到哪些生活動線？", optional: true, type: "multi", exclusive: "無固定地點", options: ["工作通勤", "學校接送", "家人照顧", "日常採買", "無固定地點"] }
     ]
   },
   {
-    id: "budget", title: "買完房後，每月多少負擔最舒服？",
-    tip: "不是想辦法買下來就好，而是買完後，生活仍要保留餘裕。",
+    id: "budget", label: "舒服預算", title: "買了房，生活也要剛剛好。",
+    tip: "先抓舒服的範圍，還沒算過也能繼續。",
     fields: [
       {
         key: "downPayment", label: "可準備自備款", type: "single",
@@ -33,36 +33,30 @@ export const QUESTION_STEPS = [
     ]
   },
   {
-    id: "space", title: "這個家，平常會怎麼使用？",
-    tip: "房間不是拿來收集的，把預算放在真正每天會用到的空間。",
+    id: "property", label: "理想的家", title: "家的基本配備，你來選。",
+    tip: "先選房數、類型和車位，其餘有想法再補。",
     fields: [
-      { key: "householdSize", label: "平常居住人數", type: "single", options: ["1 人", "2 人", "3 人", "4 人", "5 人以上"] },
       {
         key: "rooms", label: "希望房數", type: "single",
-        options: ["1房", "2房", "3房", "3房以上", "自訂"],
+        options: ["1房", "2房", "3房", "4房以上", "還沒決定", "自訂"],
         custom: { option: "自訂", key: "customRooms", label: "希望的房數或空間安排", placeholder: "例：2房加一個彈性空間" }
       },
-      { key: "thirdRoomUse", label: "第三個房間準備拿來做什麼？", type: "single", options: ["家人長住", "工作／書房", "兒童房", "偶爾來客", "還沒想好"], when: "needsThirdRoomUse" }
-    ]
-  },
-  {
-    id: "property", title: "哪些物件條件是必要的？",
-    tip: "先用類型、屋齡與車位縮小範圍，比一間一間碰運氣更有效率。",
-    fields: [
-      { key: "propertyTypes", label: "物件類型", type: "multi", options: ["電梯大樓", "華廈／公寓", "透天", "電梯透天", "其他"] },
+      { key: "propertyTypes", label: "喜歡的房子類型", type: "multi", exclusive: "還沒決定", options: ["電梯大樓", "華廈（有電梯）", "公寓（無電梯）", "透天", "電梯透天", "其他", "還沒決定"] },
+      { key: "parking", label: "車位需求", type: "single", options: ["一定要平車", "車位即可", "有最好", "不需要"] },
       {
-        key: "agePreference", label: "屋齡接受度", type: "single",
+        key: "agePreference", label: "屋齡接受度", optional: true, type: "single",
         options: ["預售屋", "5年內", "10年內", "20年內", "30年內", "不拘／看條件", "自訂"],
         custom: { option: "自訂", key: "customAgePreference", label: "可接受的屋齡", placeholder: "例：40年內可整理、或屋齡不拘" }
       },
-      { key: "parking", label: "車位需求", type: "single", options: ["一定要平車", "車位即可", "有最好", "不需要"] }
+      { key: "householdSize", label: "平常居住人數", optional: true, type: "single", options: ["1 人", "2 人", "3 人", "4 人", "5 人以上"] },
+      { key: "thirdRoomUse", label: "第三房想拿來做什麼？", optional: true, type: "single", options: ["家人長住", "工作／書房", "兒童房", "偶爾來客", "還沒想好"], when: "needsThirdRoomUse" }
     ]
   },
   {
-    id: "priorities", title: "什麼最不能妥協？",
-    tip: "裝潢可以改，但地點、格局與每天的生活方式更值得先確認。",
+    id: "priorities", label: "優先順序", title: "如果只能留 3 個，你選誰？",
+    tip: "先點最重要的，再點第二、第三名。點已選項目可取消。",
     fields: [
-      { key: "mustHaves", label: "如果只能留 3 個，您最在意什麼？", type: "multi", max: 3, options: ["地點", "格局", "採光通風", "安靜", "管理", "屋況", "生活機能", "停車", "價格"] },
+      { key: "mustHaves", label: "你的看屋優先順序", type: "multi", max: 3, options: ["地點", "格局", "採光通風", "安靜", "管理", "屋況", "生活機能", "停車", "價格"] },
       { key: "noGos", label: "一定避開，可不選", type: "multi", exclusive: "無特殊忌諱", options: ["西曬", "頂樓", "特殊風水／路沖", "基地台或高壓電", "格局問題", "無特殊忌諱", "其他"] },
       { key: "otherNoGo", label: "其他避開條件", type: "text", placeholder: "請簡單說明", when: "otherNoGo" }
     ]
@@ -106,7 +100,7 @@ export function resolveAnswer(answers, fieldKey) {
 }
 
 export function needsThirdRoomUse(answers) {
-  return answers.rooms === "3房" || answers.rooms === "3房以上";
+  return ["3房", "4房以上", "3房以上"].includes(answers.rooms);
 }
 
 export function getVisibleStepIds() {
@@ -119,6 +113,11 @@ export function clearHiddenAnswers(answers) {
   if (!next.noGos.includes("其他")) next.otherNoGo = "";
   if (next.noGos.includes("無特殊忌諱")) next.noGos = ["無特殊忌諱"];
   if (next.lifeFocus.includes("無固定地點")) next.lifeFocus = ["無固定地點"];
+  if (next.areas.includes("還沒決定")) {
+    next.areas = ["還沒決定"];
+    next.customArea = "";
+  }
+  if (next.propertyTypes.includes("還沒決定")) next.propertyTypes = ["還沒決定"];
   for (const custom of CUSTOM_FIELDS) {
     if (next[custom.parent] !== custom.option) next[custom.key] = "";
   }
@@ -137,20 +136,14 @@ export function validateStep(stepId, rawAnswers) {
   }
   if (stepId === "location") {
     if (!answers.areas.length && !answers.customArea.trim()) errors.areas = "請選擇或輸入區域";
-    requireList("lifeFocus", "請至少選擇一個生活重心");
   }
   if (stepId === "budget") {
     requireValue("downPayment", "請選擇可準備自備款");
     requireValue("monthlyMortgage", "請選擇舒服的每月房貸");
   }
-  if (stepId === "space") {
-    requireValue("householdSize", "請選擇居住人數");
-    requireValue("rooms", "請選擇希望房數");
-    if (needsThirdRoomUse(answers)) requireValue("thirdRoomUse", "請選擇第三房用途");
-  }
   if (stepId === "property") {
+    requireValue("rooms", "請選擇希望房數");
     requireList("propertyTypes", "請至少選擇一種物件類型");
-    requireValue("agePreference", "請選擇屋齡接受度");
     requireValue("parking", "請選擇車位需求");
   }
   if (stepId === "priorities") {

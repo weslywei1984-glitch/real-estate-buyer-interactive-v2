@@ -56,7 +56,7 @@ function createFakeCanvas({ blob = new Blob(["png"], { type: "image/png" }) } = 
 
 function publicResult() {
   return {
-    status: "條件整理中",
+    status: "找房方向已整理",
     headline: "先把生活與負擔對齊；\n再挑真正值得看的房子。",
     direction: [
       "這次以自住為主，先以永康區為主要範圍。",
@@ -269,13 +269,13 @@ test("result image renders the public diagnosis at 1080 by 1350 without buyer co
     for (const expected of [
       "台南小魏",
       "買厝作伙",
-      "條件整理中",
-      "先把生活與負擔對齊；",
-      "這次以自住為主",
-      "目前以自備款",
-      "室外環境、通勤與生活圈實際走過了嗎",
-      "第一眼心動後，價格與必要條件也確認了嗎",
-      "拿掉裝潢加分後，格局仍符合每天的使用方式嗎",
+      "找房方向已整理",
+      "你的找房方向，",
+      "自住 · 3個月內",
+      "自備款：",
+      "帶著常用家具尺寸看格局",
+      "先確認交屋與搬家時間",
+      "先確認平面車位是否包含在總價內",
       "0927-617-207"
     ]) {
       assert.match(text, new RegExp(expected));
@@ -445,7 +445,7 @@ test("result image excludes contact-shaped free text that entered through diagno
     ]) {
       assert.doesNotMatch(text, new RegExp(privateValue.replaceAll(".", "\\.")));
     }
-    assert.match(text, /這次以自住為主/);
+    assert.match(text, /自住 · 3個月內/);
     assert.match(text, /預算提醒/);
     assert.match(text, /0927-617-207/);
   } finally {

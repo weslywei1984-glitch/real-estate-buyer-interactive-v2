@@ -1,143 +1,72 @@
-import { resolveAnswer } from "./questions.js";
+import { resolveAnswer } from "./questions.js?v=20260906-r1";
 
-export const VIDEO_QUESTIONS = [
-  { ep: 1, text: "看屋前，總預算與可負擔範圍先確認了嗎？" },
-  { ep: 2, text: "拿掉裝潢加分後，格局仍符合每天的使用方式嗎？" },
-  { ep: 3, text: "室外環境、通勤與生活圈實際走過了嗎？" },
-  { ep: 4, text: "第一眼心動後，價格與必要條件也確認了嗎？" },
-  { ep: 5, text: "購屋完整成本與生活預備金（生活緩衝）都保留了嗎？" },
-  { ep: 6, text: "白天與晚上都看過周邊環境嗎？" },
-  { ep: 7, text: "第三房準備拿來做什麼？" },
-  { ep: 8, text: "中古屋除了裝潢，窗邊、牆角、浴室、陽台的屋況也看過了嗎？" },
-  { ep: 9, text: "出價前，必要條件、整理費用與沒買到的心理底線都想過了嗎？" },
-  { ep: 10, text: "需求範圍與物件資訊，有專人陪你一起確認與縮小嗎？" }
-];
-
-const LIFE_FOCUS_MOVEMENT = ["工作通勤", "學校接送", "家人照顧", "日常採買"];
-
-function lifeFocusList(answers) {
-  return Array.isArray(answers.lifeFocus)
-    ? answers.lifeFocus
-    : [answers.lifeFocus].filter(Boolean);
-}
-
-function readinessScore(answers) {
-  let score = 0;
-  if (answers.timeline && answers.timeline !== "先看看") score += 2;
-  if (answers.areas?.length || answers.customArea) score += 2;
-  if (answers.downPayment) score += 1;
-  if (answers.monthlyMortgage) score += 1;
-  if (answers.propertyTypes?.length) score += 1;
-  if (answers.mustHaves?.length) score += 1;
-  if (answers.moveInBudget && answers.moveInBudget !== "還沒估過") score += 1;
-  if (answers.decisionLimit === "已有明確上限，不會超過") score += 1;
-  return score;
-}
-
-function relevantVideoEpisodes(answers) {
-  const scores = new Map(VIDEO_QUESTIONS.map(item => [item.ep, 0]));
-  const add = (ep, points) => scores.set(ep, scores.get(ep) + points);
-  const mustHaves = answers.mustHaves || [];
-  const noGos = answers.noGos || [];
-  const focus = lifeFocusList(answers);
-  const budgetUnclear = answers.moveInBudget === "還沒估過"
-    || answers.decisionLimit === "希望小魏幫我抓"
-    || answers.decisionLimit === "還沒想過";
-
-  if (budgetUnclear) add(1, 4);
-  if (answers.downPayment) add(1, 1);
-
-  if (mustHaves.some(item => ["格局", "採光通風", "屋況"].includes(item))) add(2, 4);
-
-  if (answers.areas?.length || answers.customArea) add(3, 2);
-  if (focus.some(item => LIFE_FOCUS_MOVEMENT.includes(item))) add(3, 4);
-
-  if (["1個月內", "3個月內"].includes(answers.timeline)) add(4, 6);
-  if (answers.timeline === "半年內") add(4, 2);
-
-  add(5, 1);
-  if (answers.moveInBudget === "還沒估過") add(5, 5);
-  if (answers.moveInBudget === "50萬以上") add(5, 2);
-  if (budgetUnclear) add(5, 2);
-
-  if (answers.parking && answers.parking !== "不需要") add(6, 2);
-  if (mustHaves.some(item => ["安靜", "停車", "生活機能"].includes(item))) add(6, 4);
-  if (noGos.some(item => ["西曬", "頂樓", "基地台或高壓電"].includes(item))) add(6, 2);
-
-  if (answers.rooms === "3房" || answers.rooms === "3房以上") {
-    add(7, ["偶爾來客", "還沒想好", ""].includes(answers.thirdRoomUse || "") ? 8 : 4);
-  }
-
-  if (answers.conditionTolerance === "願意重新整理") add(8, 5);
-  if (answers.conditionTolerance === "看價格再決定") add(8, 4);
-  if (answers.conditionTolerance === "要能直接入住") add(8, 2);
-  if (["20年內", "30年內"].includes(answers.agePreference)) add(8, 2);
-  if (answers.agePreference === "自訂") add(8, 1);
-  if (mustHaves.includes("屋況")) add(8, 2);
-
-  if (answers.decisionLimit === "還沒想過") add(9, 7);
-  if (answers.decisionLimit === "希望小魏幫我抓") add(9, 5);
-  if (answers.decisionLimit === "可以再彈性一點") add(9, 3);
-  if (["1個月內", "3個月內"].includes(answers.timeline)) add(9, 2);
-
-  if (answers.timeline === "先看看") add(10, 4);
-  if (answers.purpose === "先了解行情") add(10, 3);
-  if ((answers.areas?.length || 0) >= 4) add(10, 2);
-  if (!mustHaves.length) add(10, 2);
-
-  return [...scores.entries()]
-    .sort(([firstEp, firstScore], [secondEp, secondScore]) => secondScore - firstScore || firstEp - secondEp)
-    .slice(0, 4)
-    .map(([ep]) => ep);
-}
+const PRIORITY_ACTIONS = {
+  地點: "把上班、接送或探望家人的路線走一遍，確認這個地點適合每天生活。",
+  格局: "帶著常用家具尺寸看格局，確認床、餐桌與收納真的放得下。",
+  採光通風: "白天關燈看自然採光，開窗感受通風，別只看照片。",
+  安靜: "平日晚上再走一趟，聽聽車流、鄰居與附近店家的聲音。",
+  管理: "確認管理費、收包裹方式與公共設施維護，再看社區公告。",
+  屋況: "現場查看窗邊、牆角、浴室與陽台，先問清楚修繕紀錄。",
+  生活機能: "從家門走到常去的超市、公園或車站，感受實際距離。",
+  停車: "實際試走車道與車位，確認尺寸、動線和日常使用方式。",
+  價格: "找同區、相近屋齡與坪數的成交資料比較，車位價格也要拆開看。"
+};
 
 export function deriveResult(answers) {
-  const score = readinessScore(answers);
-  const status = score >= 9 ? "可以開始精準比較" : score >= 6 ? "條件整理中" : "方向探索中";
-  const area = [...(answers.areas || []), answers.customArea].filter(Boolean).join("、") || "台南生活圈";
-  const focusText = lifeFocusList(answers).join("、") || "日常生活";
+  const selectedAreas = (answers.areas || []).filter(area => area !== "還沒決定");
+  const area = [...selectedAreas, answers.customArea].filter(Boolean).join("、");
+  const areaUnclear = !area;
   const downPayment = resolveAnswer(answers, "downPayment");
   const monthlyMortgage = resolveAnswer(answers, "monthlyMortgage");
-  const agePreference = resolveAnswer(answers, "agePreference");
-  const rooms = resolveAnswer(answers, "rooms");
-  const direction = [
-    `這次以${answers.purpose || "購屋"}為主，預計${answers.timeline || "尚未確定時程"}；先以${area}為主要範圍，配合${focusText}比較實際動線。`,
-    `物件先看${(answers.propertyTypes || []).join("、") || "可接受類型"}，再用屋齡「${agePreference || "待確認"}」與車位「${answers.parking || "待確認"}」縮小範圍。`
-  ];
-  const strategy = [
-    `看屋時優先確認${(answers.mustHaves || []).join("、") || "每天真正會用到的條件"}。`,
-    "不要只看裝潢；把格局、室外環境、白天與晚上的感受一起比較。",
-    answers.moveInBudget
-      ? `入住整理預算以「${answers.moveInBudget}」為起點，再把修繕、家具家電、管理費與持有成本一起算進完整成本。`
-      : "房價之外，把修繕、家具家電、管理費與持有成本一起算進購屋完整成本。",
-    answers.conditionTolerance
-      ? `依「${answers.conditionTolerance}」比較中古屋，仍要確認窗邊、牆角、浴室與陽台的實際屋況。`
-      : "比較中古屋時，確認窗邊、牆角、浴室與陽台的實際屋況，不只看裝潢。",
-    answers.decisionLimit
-      ? `出價前再用「${answers.decisionLimit}」核對必要條件與出價底線。`
-      : "出價前先設定必要條件與可接受的出價底線，避免被現場氣氛推著走。"
-  ];
-  if ((answers.rooms === "3房" || answers.rooms === "3房以上") && ["偶爾來客", "還沒想好"].includes(answers.thirdRoomUse)) {
-    strategy.unshift(`目前規劃${rooms}，但第三房用途仍有彈性，可同步比較兩房加彈性空間，避免為不常使用的房間增加負擔。`);
+  // Free text stays a stated preference, not an inferred numeric affordability assessment.
+  const budgetUnclear = !downPayment || !monthlyMortgage
+    || answers.downPayment === "還不確定" || answers.monthlyMortgage === "希望小魏協助試算"
+    || (answers.downPayment === "自訂金額" && /不確定|不知道|還在|未定|協助|試算|不清楚/.test(answers.customDownPayment || ""))
+    || (answers.monthlyMortgage === "自訂" && /不確定|不知道|還在|未定|協助|試算|不清楚/.test(answers.customMonthlyMortgage || ""));
+  const rooms = resolveAnswer(answers, "rooms") || "未填";
+  const types = (answers.propertyTypes || []).join("、") || "未填";
+  const age = resolveAnswer(answers, "agePreference") || "未填，之後確認";
+  const priorities = answers.mustHaves || [];
+  const noGos = (answers.noGos || []).map(value => value === "其他" ? answers.otherNoGo : value).filter(Boolean);
+  const status = budgetUnclear ? "先釐清預算" : areaUnclear ? "先縮小生活圈" : "找房方向已整理";
+  const actionTexts = [];
+  const add = text => { if (text && !actionTexts.includes(text)) actionTexts.push(text); };
+
+  if (budgetUnclear) add("先整理可用自備款與舒服月付，再和小魏一起確認總預算範圍。");
+  if (areaUnclear) add("先挑一個常去的地點，從可接受的通勤時間縮小生活圈。");
+  if (answers.agePreference === "預售屋" && ["1個月內", "3個月內", "半年內"].includes(answers.timeline)) {
+    add("你希望近期買房，也選了預售屋；先確認是簽約時程還是入住時程，再核對交屋時間。");
   }
-  const relevantEpisodes = relevantVideoEpisodes(answers);
-  const relevant = new Set(relevantEpisodes);
-  const questionByEpisode = new Map(VIDEO_QUESTIONS.map(item => [item.ep, item]));
-  const videoQuestions = [
-    ...relevantEpisodes.map(ep => ({ ...questionByEpisode.get(ep), relevant: true })),
-    ...VIDEO_QUESTIONS.filter(item => !relevant.has(item.ep)).map(item => ({ ...item, relevant: false }))
+  add(PRIORITY_ACTIONS[priorities[0]]);
+  if (noGos.length && !noGos.includes("無特殊忌諱")) add(`約看前先核對「${noGos.join("、")}」，減少不符合底線的帶看。`);
+  if (answers.parking === "一定要平車") add("先確認平面車位是否包含在總價內，再實際試停車道與車位。");
+  if (["3房", "4房以上", "3房以上"].includes(answers.rooms) && ["偶爾來客", "還沒想好"].includes(answers.thirdRoomUse)) {
+    add("第三房用途仍有彈性，可以一起比較兩房加彈性空間，看看哪種更好用。");
+  }
+  priorities.slice(1).forEach(priority => add(PRIORITY_ACTIONS[priority]));
+  if (answers.rooms === "還沒決定") add("先列出每天使用的睡眠、工作與收納空間，再決定房數。");
+  if (["1個月內", "3個月內"].includes(answers.timeline)) add("先確認交屋與搬家時間，再挑符合時程的物件安排看屋。");
+  add("把房價、稅費與修繕一起列出，並保留生活預備金。");
+  add("先比較 2～3 間符合條件的房子，每間用相同條件做筆記。");
+  add("看屋時拍下喜歡與有疑問的地方，回家再一起比較。");
+  const strategy = actionTexts.slice(0, 3);
+  const direction = [
+    `${answers.purpose || "購屋"} · ${answers.timeline || "時程未填"} · ${area || "生活圈待確認"}${answers.lifeFocus?.length ? `（${[].concat(answers.lifeFocus).join("、")}）` : ""}`,
+    `${rooms} · ${types} · ${answers.parking || "車位未填"}${answers.agePreference ? ` · ${age}` : ""}`
   ];
-  const priorityPreview = videoQuestions.filter(item => item.relevant).slice(0, 3);
-  const budgetDetail = answers.moveInBudget
-    ? `入住整理預算「${answers.moveInBudget}」也一起估入。`
-    : "房價之外，再預留入住整理與修繕空間。";
-  return {
-    status,
-    headline: "先把生活與負擔對齊；\n再挑真正值得看的房子。",
-    direction,
-    budgetReminder: `目前以自備款「${downPayment || "待確認"}」與舒服月付「${monthlyMortgage || "待確認"}」整理方向；${budgetDetail}另外保留生活餘裕，並把修繕、管理費與持有成本一起算。實際貸款仍以銀行審核與個人條件為準。`,
-    strategy,
-    priorityPreview,
-    videoQuestions
-  };
+  const budgetReminder = `自備款：${downPayment || "未填"}；舒服月付：${monthlyMortgage || "未填"}。另留稅費、修繕與生活預備金；實際貸款依銀行審核。`;
+  const facts = [
+    { label: "買房計畫", value: `${answers.purpose || "未填"} · ${answers.timeline || "未填"}`, step: "intent" },
+    { label: "生活圈", value: area || "還沒決定，一起找方向", step: "location" },
+    { label: "舒服預算", value: `自備 ${downPayment || "未填"} ／ 月付 ${monthlyMortgage || "未填"}`, step: "budget" },
+    { label: "理想的家", value: `${rooms} · ${types} · ${answers.parking || "車位未填"}`, step: "property" },
+    { label: "屋齡", value: age, step: "property" },
+    ...(answers.lifeFocus?.length ? [{ label: "生活動線", value: [].concat(answers.lifeFocus).join("、"), step: "location" }] : []),
+    ...(answers.householdSize ? [{ label: "居住人數", value: answers.householdSize, step: "property" }] : []),
+    ...(answers.thirdRoomUse ? [{ label: "第三房用途", value: answers.thirdRoomUse, step: "property" }] : []),
+    { label: "優先順序", value: priorities.map((value, i) => `${i + 1}. ${value}`).join(" → ") || "未填", step: "priorities" },
+    { label: "一定避開", value: noGos.join("、") || "未填，之後確認", step: "priorities" }
+  ];
+  return { status, headline: "你的找房方向，\n有輪廓了。", direction, facts, budgetReminder, strategy,
+    priorityPreview: strategy.map((text, i) => ({ id: `next-${i + 1}`, text, relevant: true })) };
 }
