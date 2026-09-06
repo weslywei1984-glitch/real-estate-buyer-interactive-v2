@@ -1,5 +1,5 @@
-import { deriveResult } from "./result.js?v=20260906-r2";
-import { needsThirdRoomUse, QUESTION_STEPS } from "./questions.js?v=20260906-r2";
+import { deriveResult } from "./result.js?v=20260906-r3";
+import { needsThirdRoomUse, QUESTION_STEPS } from "./questions.js?v=20260906-r3";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;

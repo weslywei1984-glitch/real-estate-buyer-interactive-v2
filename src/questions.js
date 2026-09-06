@@ -17,22 +17,6 @@ export const QUESTION_STEPS = [
     ]
   },
   {
-    id: "budget", label: "舒服預算", title: "買了房，生活也要剛剛好。",
-    tip: "先抓舒服的範圍，還沒算過也能繼續。",
-    fields: [
-      {
-        key: "downPayment", label: "可準備自備款", type: "single",
-        options: ["100萬以下", "100～200萬", "200～300萬", "300～500萬", "500萬以上", "還不確定", "自訂金額"],
-        custom: { option: "自訂金額", key: "customDownPayment", label: "自備款金額", placeholder: "例：250萬" }
-      },
-      {
-        key: "monthlyMortgage", label: "舒服的每月房貸", type: "single",
-        options: ["2萬內", "2～3萬", "3～4萬", "4～5萬", "5萬以上", "希望小魏協助試算", "自訂"],
-        custom: { option: "自訂", key: "customMonthlyMortgage", label: "每月可負擔金額", placeholder: "例：3萬5，或想請小魏協助試算" }
-      }
-    ]
-  },
-  {
     id: "property", label: "理想的家", title: "家的基本配備，你來選。",
     tip: "先選房數、類型和車位，其餘有想法再補。",
     fields: [
@@ -50,6 +34,22 @@ export const QUESTION_STEPS = [
       },
       { key: "householdSize", label: "平常居住人數", optional: true, type: "single", options: ["1 人", "2 人", "3 人", "4 人", "5 人以上"] },
       { key: "thirdRoomUse", label: "第三房想拿來做什麼？", optional: true, type: "single", options: ["家人長住", "工作／書房", "兒童房", "偶爾來客", "還沒想好"], when: "needsThirdRoomUse" }
+    ]
+  },
+  {
+    id: "budget", label: "舒服預算", title: "買了房，生活也要剛剛好。",
+    tip: "先抓舒服的範圍，還沒算過也能繼續。",
+    fields: [
+      {
+        key: "downPayment", label: "可準備自備款", type: "single",
+        options: ["100萬以下", "100～200萬", "200～300萬", "300～500萬", "500萬以上", "還不確定", "自訂金額"],
+        custom: { option: "自訂金額", key: "customDownPayment", label: "自備款金額", placeholder: "例：250萬" }
+      },
+      {
+        key: "monthlyMortgage", label: "舒服的每月房貸", type: "single",
+        options: ["2萬內", "2～3萬", "3～4萬", "4～5萬", "5萬以上", "希望小魏協助試算", "自訂"],
+        custom: { option: "自訂", key: "customMonthlyMortgage", label: "每月可負擔金額", placeholder: "例：3萬5，或想請小魏協助試算" }
+      }
     ]
   },
   {
@@ -161,4 +161,23 @@ export function validateStep(stepId, rawAnswers) {
   }
 
   return { valid: Object.keys(errors).length === 0, errors };
+}
+
+export function getQuestionProgress(answers) {
+  const total = QUESTION_STEPS.length;
+  const completed = QUESTION_STEPS.filter(step => validateStep(step.id, answers).valid).length;
+  return { completed, total, remaining: total - completed };
+}
+
+export function getStepFeedback(stepId, rawAnswers) {
+  const answers = clearHiddenAnswers(rawAnswers);
+  if (!validateStep(stepId, answers).valid) return "";
+  const summary = {
+    intent: () => `${answers.purpose} · ${answers.timeline}`,
+    location: () => [...answers.areas, answers.customArea.trim()].filter(Boolean).join("、"),
+    property: () => `${resolveAnswer(answers, "rooms")} · ${answers.propertyTypes.join("、")} · ${answers.parking}`,
+    budget: () => `自備 ${resolveAnswer(answers, "downPayment")} · 月付 ${resolveAnswer(answers, "monthlyMortgage")}`,
+    priorities: () => answers.mustHaves.map((value, i) => `${i + 1}. ${value}`).join(" → ")
+  }[stepId];
+  return summary ? `已記下：${summary()}` : "";
 }

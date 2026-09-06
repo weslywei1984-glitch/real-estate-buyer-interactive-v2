@@ -12,7 +12,7 @@ import {
 test("defines five question screens without a decision screen", () => {
   assert.equal(QUESTION_STEPS.length, 5);
   assert.deepEqual(QUESTION_STEPS.map(step => step.id), [
-    "intent", "location", "budget", "property", "priorities"
+    "intent", "location", "property", "budget", "priorities"
   ]);
 });
 

@@ -1,4 +1,4 @@
-import { resolveAnswer } from "./questions.js?v=20260906-r2";
+import { resolveAnswer } from "./questions.js?v=20260906-r3";
 
 const PRIORITY_ACTIONS = {
   地點: "把上班、接送或探望家人的路線走一遍，確認這個地點適合每天生活。",
@@ -29,6 +29,23 @@ export function deriveResult(answers) {
   const priorities = answers.mustHaves || [];
   const noGos = (answers.noGos || []).map(value => value === "其他" ? answers.otherNoGo : value).filter(Boolean);
   const status = budgetUnclear ? "先釐清預算" : areaUnclear ? "先縮小生活圈" : "找房方向已整理";
+  const contactOffer = budgetUnclear ? {
+    title: "先釐清預算，再開始找房",
+    description: "還沒算清楚也沒關係。留下聯絡方式，小魏會先和你整理自備款與舒服月付，再討論找房範圍。",
+    action: "請小魏幫我釐清預算"
+  } : areaUnclear ? {
+    title: "一起把生活圈，縮小一點",
+    description: "還沒決定住哪裡，就從每天常去的地方聊起。小魏會和你確認通勤與生活需求，一起挑出想看的區域。",
+    action: "請小魏幫我縮小生活圈"
+  } : answers.purpose === "先了解行情" ? {
+    title: "先聊方向，慢慢找也可以",
+    description: `你正在了解「${area}」。留下聯絡方式，小魏會依這份清單和你聊聊條件，先找到適合自己的下一步。`,
+    action: "請小魏和我聊聊找房方向"
+  } : {
+    title: "下一步，讓小魏幫你找房",
+    description: `你想找「${area}${rooms !== "還沒決定" && rooms !== "未填" ? `、${rooms}` : ""}」${priorities[0] ? `，最在意「${priorities[0]}」` : ""}。留下聯絡方式，小魏會先確認這些需求，再和你一起縮小找房範圍。`,
+    action: "請小魏幫我找房"
+  };
   const actionTexts = [];
   const add = text => { if (text && !actionTexts.includes(text)) actionTexts.push(text); };
 
@@ -67,6 +84,6 @@ export function deriveResult(answers) {
     { label: "優先順序", value: priorities.map((value, i) => `${i + 1}. ${value}`).join(" → ") || "未填", step: "priorities" },
     { label: "一定避開", value: noGos.join("、") || "未填，之後確認", step: "priorities" }
   ];
-  return { status, headline: "你的找房方向，\n有輪廓了。", direction, facts, budgetReminder, strategy,
+  return { status, headline: "你的找房方向，\n有輪廓了。", direction, facts, budgetReminder, strategy, contactOffer,
     priorityPreview: strategy.map((text, i) => ({ id: `next-${i + 1}`, text, relevant: true })) };
 }

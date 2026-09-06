@@ -3,12 +3,14 @@ import {
   clearHiddenAnswers,
   createInitialAnswers,
   customFieldFor,
+  getQuestionProgress,
+  getStepFeedback,
   needsThirdRoomUse,
   validateStep
-} from "./questions.js?v=20260906-r2";
-import { deriveResult } from "./result.js?v=20260906-r2";
-import { downloadResultImage } from "./result-image.js?v=20260906-r2";
-import { buildPayload, buildSummary } from "./payload.js?v=20260906-r2";
+} from "./questions.js?v=20260906-r3";
+import { deriveResult } from "./result.js?v=20260906-r3";
+import { downloadResultImage } from "./result-image.js?v=20260906-r3";
+import { buildPayload, buildSummary } from "./payload.js?v=20260906-r3";
 import { isValidContact, normalizeContact } from "./contact.js";
 import { submitLead } from "./api.js";
 import { randomId } from "./random.js";
@@ -403,6 +405,7 @@ function bindQuestionEvents() {
       state.answers = clearHiddenAnswers(state.answers);
       refreshStepErrorState();
       syncStepErrorUi();
+      syncQuestionProgress();
     });
   });
 
@@ -445,26 +448,40 @@ function renderIntro({ focus = true } = {}) {
   if (focus) focusElement($("hero").querySelector("h1"));
 }
 
-function renderQuestion({ focus = true } = {}) {
-  $("hero").hidden = true;
-  $("wizard").hidden = false;
-  $("resultArea").hidden = true;
+function syncQuestionProgress() {
   const step = QUESTION_STEPS[state.stepIndex];
   const currentStep = state.stepIndex + 1;
+  const { completed, total, remaining } = getQuestionProgress(state.answers);
   $("progressText").textContent = `${String(currentStep).padStart(2, "0")} / ${String(QUESTION_STEPS.length).padStart(2, "0")}　${step.label}`;
-  const progressRow = $("progressText").parentElement;
+  $("progressCount").textContent = remaining ? `已完成 ${completed}／${total}` : "選好了，隨時都能改";
+  const progressRow = document.querySelector(".progress-row");
   let milestone = progressRow.querySelector(".progress-milestone");
   if (!milestone) {
     milestone = document.createElement("p");
     milestone.className = "progress-milestone";
     progressRow.append(milestone);
   }
-  milestone.innerHTML = QUESTION_STEPS.map((item, index) => `<span class="step-stop${index === state.stepIndex ? " current" : ""}${index < state.stepIndex ? " done" : ""}" ${index === state.stepIndex ? 'aria-current="step"' : ""}><i aria-hidden="true">${index < state.stepIndex ? "✓" : index + 1}</i>${item.label}</span>`).join("");
-  $("progressBar").style.width = `${(currentStep / QUESTION_STEPS.length) * 100}%`;
+  milestone.innerHTML = QUESTION_STEPS.map((item, index) => {
+    const done = validateStep(item.id, state.answers).valid;
+    return `<span class="step-stop${index === state.stepIndex ? " current" : ""}${done ? " done" : ""}" ${index === state.stepIndex ? 'aria-current="step"' : ""}><i aria-hidden="true">${done ? "✓" : index + 1}</i>${item.label}</span>`;
+  }).join("");
+  $("progressBar").style.width = `${(completed / total) * 100}%`;
   const progress = document.querySelector("[role='progressbar']");
-  progress.setAttribute("aria-valuemax", String(QUESTION_STEPS.length));
-  progress.setAttribute("aria-valuenow", String(currentStep));
-  progress.setAttribute("aria-valuetext", `第 ${currentStep} 步，共 ${QUESTION_STEPS.length} 步：${step.label}`);
+  progress.setAttribute("aria-valuemax", String(total));
+  progress.setAttribute("aria-valuenow", String(completed));
+  progress.setAttribute("aria-valuetext", `已完成 ${completed} 個步驟，還有 ${remaining} 個：目前是${step.label}`);
+  const feedback = getStepFeedback(step.id, state.answers);
+  $("stepFeedback").textContent = feedback || "選好再往下，之後也能改。";
+  $("stepFeedback").title = feedback;
+  $("stepFeedback").classList.toggle("recorded", Boolean(feedback));
+}
+
+function renderQuestion({ focus = true } = {}) {
+  $("hero").hidden = true;
+  $("wizard").hidden = false;
+  $("resultArea").hidden = true;
+  const step = QUESTION_STEPS[state.stepIndex];
+  syncQuestionProgress();
   const optional = step.fields.filter(field => field.optional || field.key === "customArea");
   const required = step.fields.filter(field => !optional.includes(field));
   const optionalTitle = step.id === "location" ? "指定生活圈、通勤需求" : "屋齡、居住人數等細節";
@@ -502,7 +519,7 @@ function resultPreview(result) {
     <span class="result-status">${escapeHtml(result.status)}</span>
     <h2 tabindex="-1">${headlineLines.map(line => `<span class="result-headline-line">${escapeHtml(line)}</span>`).join("")}</h2>
     <dl class="result-facts">${result.facts.filter(fact => mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
-    ${state.phase !== "complete" ? `<a class="primary lead-prompt" id="leadJump" href="#leadForm">用這份需求，請小魏幫我找房 ↗</a>` : ""}
+    ${state.phase !== "complete" ? `<a class="primary lead-prompt" id="leadJump" href="#leadForm">${escapeHtml(result.contactOffer.action)} ↗</a>` : ""}
     <details class="result-details"><summary>查看完整條件與預算提醒</summary>
       <dl class="result-facts">${result.facts.filter(fact => !mainLabels.includes(fact.label)).map(factHtml).join("")}</dl>
       <p class="budget-note">${escapeHtml(result.budgetReminder)}</p>
@@ -595,13 +612,14 @@ function renderResult({ focus = true } = {}) {
     ? "正在送出…"
     : state.submitAttempted && state.submitError
       ? "重新送出並確認"
-      : "請小魏聯絡我";
+      : result.contactOffer.action;
 
   $("resultArea").innerHTML = `${resultPreview(result)}
     <details id="contactDetails" class="contact-details" ${state.contactExpanded || state.submitting || state.submitError ? "open" : ""}>
-    <summary>下一步，讓小魏幫你找房<span>依你的需求回覆</span></summary>
+    <summary>${escapeHtml(result.contactOffer.title)}<span>依你的需求回覆</span></summary>
     <form id="leadForm" class="result-card contact-card" novalidate aria-busy="${state.submitting}">
-      <p class="contact-intro">留下稱呼及手機或 LINE ID，小魏會依你的生活圈、預算與必要條件，和你一起縮小找房範圍。</p>
+      <p class="contact-intro">${escapeHtml(result.contactOffer.description)}</p>
+      <p class="contact-next">送出後：小魏聯繫你 → 確認需求 → 討論下一步</p>
       <div class="contact-grid">
         <label class="field" for="name"><span>怎麼稱呼您？</span><input id="name" autocomplete="name" value="${escapeHtml(state.answers.name)}" required${locked}><span class="field-guidance name-guidance" aria-hidden="true"></span></label>
         <label class="field" for="phone"><span>手機號碼或 LINE ID</span><input id="phone" type="text" inputmode="text" autocomplete="tel" aria-describedby="phoneGuidance" value="${escapeHtml(state.answers.phone)}" required${locked}><span class="field-guidance" id="phoneGuidance"></span></label>
@@ -610,7 +628,7 @@ function renderResult({ focus = true } = {}) {
       <p class="contact-privacy">聯絡資料只用於回覆這次需求；也可以先保存清單，之後再聊。</p>
       <div class="form-error" id="submitError" role="alert" tabindex="-1">${escapeHtml(state.submitError)}</div>
       <div class="submit-row">
-        <button class="primary" id="submitButton" type="submit">${buttonLabel}</button>
+        <button class="primary" id="submitButton" type="submit">${escapeHtml(buttonLabel)}</button>
         <p class="submit-state" id="submitState" role="status">${state.submitting ? "正在送出你的找房清單，請稍候。" : ""}</p>
       </div>
     </form></details>

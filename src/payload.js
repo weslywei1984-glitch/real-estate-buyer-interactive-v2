@@ -1,4 +1,4 @@
-import { resolveAnswer } from "./questions.js?v=20260906-r2";
+import { resolveAnswer } from "./questions.js?v=20260906-r3";
 import { normalizeContact } from "./contact.js";
 
 function listOf(value) {

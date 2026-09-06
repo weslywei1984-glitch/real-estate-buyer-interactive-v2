@@ -1266,3 +1266,9 @@ legend { font-size: 14px; margin-bottom: 10px; }
 .contact-card .contact-intro { margin-top: 0; color: #3e5637; }
 .contact-card .contact-privacy { font-size: 11px; line-height: 1.7; color: #64745c; margin: 12px 0; }
 .contact-card #submitButton { width: 100%; min-height: 52px; box-shadow: none; }
+.progress-caption { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#progressCount { color: #66745e; font-size: 11px; }
+.wizard-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; }
+.step-feedback { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.8; color: #6a7562; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step-feedback.recorded { color: #375b34; }
+.contact-next { padding: 10px 12px; margin: 0 0 18px; border-radius: 8px; background: #eaf0df; color: #526545; font-size: 11px; line-height: 1.8; }

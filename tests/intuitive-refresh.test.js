@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deriveResult } from "../src/result.js";
-import { QUESTION_STEPS, clearHiddenAnswers, validateStep, createInitialAnswers } from "../src/questions.js";
+import { QUESTION_STEPS, clearHiddenAnswers, validateStep, createInitialAnswers, getQuestionProgress, getStepFeedback } from "../src/questions.js";
 import { buildSummary } from "../src/payload.js";
 
 const complete = () => ({ ...createInitialAnswers(), purpose: "自住", timeline: "半年內",
@@ -10,7 +10,7 @@ const complete = () => ({ ...createInitialAnswers(), purpose: "自住", timeline
   mustHaves: ["格局", "採光通風"], noGos: ["西曬"] });
 
 test("five screens can be completed without optional personal details", () => {
-  assert.deepEqual(QUESTION_STEPS.map(step => step.id), ["intent", "location", "budget", "property", "priorities"]);
+  assert.deepEqual(QUESTION_STEPS.map(step => step.id), ["intent", "location", "property", "budget", "priorities"]);
   for (const step of QUESTION_STEPS) assert.equal(validateStep(step.id, complete()).valid, true, step.id);
 });
 
@@ -69,4 +69,38 @@ test("empty optional data is not represented as no preference or invented income
   assert.doesNotMatch(JSON.stringify(result), /保證|核貸成功|一定買得到|穩賺|年薪/);
   assert.match(result.budgetReminder, /銀行/);
   assert.match(result.budgetReminder, /修繕|生活預備金/);
+});
+
+test("progress counts valid answers including uncertainty, never visited screens", () => {
+  const answers = createInitialAnswers();
+  assert.deepEqual(getQuestionProgress(answers), { completed: 0, total: 5, remaining: 5 });
+  answers.purpose = "自住";
+  assert.equal(getQuestionProgress(answers).completed, 0);
+  answers.timeline = "先看看";
+  assert.equal(getQuestionProgress(answers).completed, 1);
+  assert.equal(getQuestionProgress({ ...complete(), downPayment: "還不確定" }).completed, 5);
+  assert.deepEqual(getQuestionProgress({ ...complete(), rooms: "自訂", customRooms: " " }),
+    { completed: 4, total: 5, remaining: 1 });
+});
+
+test("feedback reflects explicit answers and waits for incomplete custom fields", () => {
+  assert.equal(getStepFeedback("intent", createInitialAnswers()), "");
+  assert.match(getStepFeedback("priorities", complete()), /格局.*採光通風/);
+  assert.equal(getStepFeedback("budget", { ...complete(), downPayment: "自訂金額", customDownPayment: "" }), "");
+  const custom = { ...complete(), downPayment: "自訂金額", customDownPayment: "250萬" };
+  assert.match(getStepFeedback("budget", custom), /250萬/);
+  assert.match(getStepFeedback("location", { ...complete(), areas: ["還沒決定"] }), /還沒決定/);
+});
+
+test("contact invitation responds to the buyer's unresolved question", () => {
+  const unclearBudget = deriveResult({ ...complete(), downPayment: "還不確定", areas: ["還沒決定"] });
+  assert.equal(unclearBudget.contactOffer.action, "請小魏幫我釐清預算");
+  assert.match(unclearBudget.contactOffer.description, /自備款|月付/);
+  const unclearArea = deriveResult({ ...complete(), areas: ["還沒決定"] });
+  assert.equal(unclearArea.contactOffer.action, "請小魏幫我縮小生活圈");
+  const defined = deriveResult(complete());
+  assert.equal(defined.contactOffer.action, "請小魏幫我找房");
+  assert.match(defined.contactOffer.description, /永康區.*3房.*格局/);
+  const exploring = deriveResult({ ...complete(), purpose: "先了解行情" });
+  assert.equal(exploring.contactOffer.action, "請小魏和我聊聊找房方向");
 });

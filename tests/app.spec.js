@@ -27,8 +27,8 @@ async function finishQuestions(page) {
   await choose(page, "找找我的買房方向");
   await choose(page, "自住"); await choose(page, "半年內"); await next(page);
   await choose(page, "東區"); await next(page);
-  await choose(page, "200～300萬"); await choose(page, "3～4萬"); await next(page);
   await choose(page, "3房"); await choose(page, "電梯大樓"); await choose(page, "一定要平車"); await next(page);
+  await choose(page, "200～300萬"); await choose(page, "3～4萬"); await next(page);
   await choose(page, "格局"); await choose(page, "安靜");
   await choose(page, "看我的找房清單 ↗");
 }
@@ -102,20 +102,62 @@ test("uncertain budgets produce a concrete first action and can be edited direct
   await choose(page,"更新方向卡");
   await expect(page.locator(".result-status")).toHaveText("先釐清預算");
   await expect(page.locator("[data-preview-priority]").first()).toContainText("自備款與舒服月付");
+  await expect(page.locator("#leadJump")).toContainText("請小魏幫我釐清預算");
+  await expect(page.locator("#submitButton")).toHaveText("請小魏幫我釐清預算");
+  await page.locator("#contactDetails > summary").click();
+  await page.locator("#leadJump").click();
+  await expect(page.locator("#name")).toBeFocused();
+  await expect(page.locator("#consent")).not.toBeChecked();
+});
+
+test("progress stays honest when going back or changing custom text", async ({page}) => {
+  await page.goto("/"); await choose(page, "找找我的買房方向");
+  const progress = page.getByRole("progressbar");
+  await expect(progress).toHaveAttribute("aria-valuenow", "0");
+  await choose(page, "自住");
+  await expect(progress).toHaveAttribute("aria-valuenow", "0");
+  await choose(page, "半年內");
+  await expect(progress).toHaveAttribute("aria-valuenow", "1");
+  await expect(page.locator("#stepFeedback")).toContainText("自住 · 半年內");
+  await next(page); await choose(page, "上一步");
+  await expect(progress).toHaveAttribute("aria-valuenow", "1");
+  await next(page); await choose(page, "還沒決定");
+  await page.locator(".optional-details > summary").click();
+  await page.getByLabel("其他區域").fill("東橋生活圈");
+  await expect(page.locator("#stepFeedback")).toContainText("東橋生活圈");
+  await expect(progress).toHaveAttribute("aria-valuenow", "2");
+  await page.getByLabel("其他區域").fill("");
+  await expect(progress).toHaveAttribute("aria-valuenow", "1");
+  await expect(page.locator("#stepFeedback")).not.toContainText("已記下");
+});
+
+test("personalized invitation follows area and purpose edits and safely displays custom text", async ({page}) => {
+  await page.goto("/?testStep=result");
+  await choose(page, "修改生活圈"); await choose(page, "還沒決定"); await choose(page, "更新方向卡");
+  await expect(page.locator("#submitButton")).toHaveText("請小魏幫我縮小生活圈");
+  await choose(page, "修改生活圈");
+  await page.locator(".optional-details > summary").click();
+  await page.getByLabel("其他區域").fill("東橋 <em>生活圈</em>");
+  await choose(page, "更新方向卡");
+  await expect(page.locator(".contact-intro")).toContainText("東橋 <em>生活圈</em>");
+  await expect(page.locator(".contact-intro em")).toHaveCount(0);
+  await page.locator(".result-details > summary").click();
+  await choose(page, "修改買房計畫"); await choose(page, "先了解行情"); await choose(page, "更新方向卡");
+  await expect(page.locator("#submitButton")).toHaveText("請小魏和我聊聊找房方向");
 });
 
 test("contact validation names missing fields and requires consent", async ({page}) => {
   await page.goto("/?testStep=result"); await openContact(page);
-  await choose(page,"請小魏聯絡我"); await expect(page.locator("#name")).toBeFocused();
+  await choose(page,"請小魏幫我找房"); await expect(page.locator("#name")).toBeFocused();
   await page.getByLabel("怎麼稱呼您？").fill("測試");
-  await choose(page,"請小魏聯絡我"); await expect(page.locator("#phone")).toBeFocused();
+  await choose(page,"請小魏幫我找房"); await expect(page.locator("#phone")).toBeFocused();
   await page.getByLabel("手機號碼或 LINE ID").fill("buyer_test");
-  await choose(page,"請小魏聯絡我"); await expect(page.locator("#consent")).toBeFocused();
+  await choose(page,"請小魏幫我找房"); await expect(page.locator("#consent")).toBeFocused();
 });
 
 test("submission locks edits, sends once, and only confirmed success is shown", async ({page}) => {
   await page.goto("/?testStep=result"); await mockSubmission(page); await fillContact(page);
-  await choose(page,"請小魏聯絡我");
+  await choose(page,"請小魏幫我找房");
   await expect(page.locator("#submitButton")).toBeDisabled();
   await expect(page.getByRole("button",{name:"修改生活圈"})).toBeDisabled();
   await expect(page.locator(".complete-card")).toHaveCount(0);
@@ -127,7 +169,7 @@ test("submission locks edits, sends once, and only confirmed success is shown", 
 
 test("uncertain retries preserve submission ids; edited answers generate new snapshots", async ({page}) => {
   await page.goto("/?testStep=result"); await mockSubmission(page); await fillContact(page);
-  await choose(page,"請小魏聯絡我");
+  await choose(page,"請小魏幫我找房");
   await page.evaluate(() => window.__submissionControl.reject(Object.assign(new Error("test"),{code:"SUBMISSION_NOT_CONFIRMED"})));
   await expect(page.locator("#submitError")).toContainText("尚未確認");
   await choose(page,"重新送出並確認");
